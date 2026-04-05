@@ -95,12 +95,13 @@ When the user describes multiple changes at once, apply them all in a single fil
 
 ## Integration with the brainstorm pipeline
 
-When the user wants to brainstorm and `.ai/todo.md` exists:
-- The todo list can serve as input context for `brainstorm`. Items in **Now** and **Next** represent known priorities and desires.
-- When `brainstorm-synthesize` produces a `final_plan.md`, the user may want to update the todo list to reflect the new plan. Suggest this but don't do it automatically.
-- When `execute-plan` completes phases, suggest checking off related todo items.
+The todo list participates in the brainstorm → synthesize → execute → review pipeline:
 
-This skill does **not** automatically modify the todo list based on other skills' outputs. It only suggests updates.
+1. **brainstorm** reads `.ai/todo.md` and uses **Now**/**Next** items as context. If the brainstorm addresses specific items, it lists them in a `## 17. Todo Context` section in `claude_brainstorm.md`.
+2. **brainstorm-synthesize** carries those references into `final_plan.md` as `## 15. Todo References`.
+3. **execute-review**, when it archives a fully completed and reviewed plan, reads `## 15. Todo References` from `final_plan.md` and marks those items as done in `.ai/todo.md`.
+
+This means: if a todo item triggers a brainstorm and makes it all the way through execution and review, it gets auto-completed at the end. No manual cleanup needed.
 
 ## Integration with execute-plan
 
