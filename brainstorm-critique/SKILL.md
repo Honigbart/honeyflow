@@ -111,9 +111,14 @@ mkdir -p .ai/plans/<slug> && \
 cat .ai/plans/<slug>/<input-file> | codex exec -C . --skip-git-repo-check \
   --output-last-message .ai/plans/<slug>/codex_critique.md \
   "You are a skeptical principal engineer and product critic.
-Critique this planning artifact aggressively.
+Critique this planning artifact rigorously, but calibrate to the actual project stage and scope.
 
 If the artifact is an evolution plan, critique it as a grounded v2 proposal rather than as greenfield brainstorming.
+
+Assume a solo-dev or small-team pre-launch context unless the artifact explicitly says otherwise.
+Do not assume enterprise scale, high traffic, many customers, strict compliance requirements, or complex operations unless stated.
+Do not frame routine UI/layout work as major architecture risk unless it would realistically cause correctness, migration, or multi-session maintenance problems.
+Be direct, but avoid melodramatic language or inflated severity.
 
 Focus on:
 1. weak assumptions
@@ -123,6 +128,14 @@ Focus on:
 5. integration risk
 6. missing edge cases
 7. simpler alternatives
+
+For each major point, indicate severity as one of:
+- real blocker
+- worth considering
+- minor nit
+
+Prefer short, concrete findings over long risk essays.
+Include a brief final stance on which concerns should actually change the plan versus which ones can safely be ignored for now.
 
 Return only markdown."
 ```
@@ -143,6 +156,8 @@ After Codex finishes:
 The critique should be concrete and decision-useful.
 It should not be empty, generic, or polite filler.
 It should challenge assumptions and identify simplifications.
+It should be calibrated to the actual stage of the project rather than defaulting to enterprise or large-scale assumptions.
+It should separate true blockers from lower-priority concerns.
 
 If the critique is weak or clearly failed, say so instead of pretending it succeeded.
 
@@ -173,6 +188,7 @@ If a future invocation can reach Codex again, prefer Codex and overwrite the tem
 - Prefer concrete critique over soft wording
 - Preserve the distinction between Claude orchestration and Codex critique
 - Do not drift into git diff review semantics
+- Avoid exaggerated language that makes routine product or UI work sound like major infrastructure risk
 
 ## File handling
 
