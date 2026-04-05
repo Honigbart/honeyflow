@@ -243,7 +243,7 @@ Follow this loop exactly once for the selected phase.
    Then:
    - mark the phase `reviewed`
    - set `reviewed_on`
-   - archive the review artifact
+   - archive the review artifact after `review.md` contains the final archive path note
    - if that makes the whole plan implementation-complete and review-complete, archive the plan too
    - update execution state
    - stop
@@ -262,11 +262,14 @@ Rules:
 If Claude changes code:
 - commit with prefix `Claude's fix of phase X code review`
 - preferred format: `Claude's fix of phase X code review: <short summary>`
+- create exactly one logical fix commit for the Claude pass, not a stream of micro-commits
+- commit only after the accepted fix is in a coherent state and the smallest relevant verification has run
 - record the commit SHA in `review_commit_claude`
 - set `review_status: claude-fixed`
 
 If Claude makes no code changes:
 - do not create an empty commit
+- do not create a commit for review notes, `review.md`, `execution_state.md`, or archive bookkeeping alone
 - record `review_commit_claude: none`
 - explain briefly in `## 3. Claude Fix Pass`
 
@@ -284,6 +287,7 @@ If medium/high problems from the review still persist and Codex agrees they shou
 - run the smallest relevant verification
 - commit with a message that explicitly says it was fixed by Codex
 - preferred format: `Codex fix of phase X code review: <short summary> (fixed by Codex)`
+- create exactly one logical fix commit for this Codex pass, not multiple incremental cleanup commits
 - record the commit SHA in `review_commit_codex`
 - set `review_status: codex-fixed`
 - document the action briefly in `## 5. Codex Fix Pass`
@@ -315,6 +319,7 @@ If Codex agrees with Claude's final medium/high findings:
 - Codex may make one final fix pass
 - run the smallest relevant verification
 - commit with a message that explicitly says it was fixed by Codex
+- keep this as one coherent final fix commit
 - update `review_commit_codex` to the latest Codex review-fix commit SHA
 - document the result briefly
 - then finish
@@ -334,7 +339,7 @@ Do not add unnecessary prose.
 Unless the outcome is `in disagreement`, finish by:
 - marking the phase `reviewed`
 - setting `reviewed_on`
-- archiving the final review artifact
+- archiving the final review artifact after `review.md` contains the final archive path note
 - if that makes the whole plan implementation-complete and review-complete, archive the plan too
 - updating `execution_state.md`
 
@@ -353,10 +358,13 @@ Use this gate:
 
 If both are true, and the user has not said to keep the plan active:
 1. **Mark linked todo items as done.** Check whether `.ai/plans/<slug>/final_plan.md` contains a `## 15. Todo References` section. If it does, read `.ai/todo.md` and mark each referenced item as done (move to the **Done** section with `[x]` and append `— YYYY-MM-DD`). If `.ai/todo.md` does not exist or a referenced item is not found (already removed or reworded), skip silently.
-2. Copy `.ai/plans/<slug>/` contents to `.ai/archive/<slug>/`
-3. Delete `.ai/plans/<slug>/` directory
-4. Update `.ai/plans.md`: set status to `completed`
-5. Note the archive path in `## 7. Final Outcome`
+2. Record the final review archive path in `## 7. Final Outcome` in `review.md` and in `review_notes` in `execution_state.md`
+3. Ensure the final review artifact is archived while the live plan directory still exists
+4. Copy `.ai/plans/<slug>/` contents to `.ai/archive/<slug>/`
+5. Update `.ai/plans.md`: set status to `completed`
+6. Delete `.ai/plans/<slug>/` directory as the final filesystem step
+
+Once the plan directory is deleted, the archived review snapshot becomes the canonical review artifact for that phase. Do not expect `.ai/plans/<slug>/review.md` to remain present after full plan archival.
 
 If implementation is complete but review is not complete:
 - do not archive the plan
@@ -367,10 +375,16 @@ If any phase remains `in disagreement`, do not archive the plan unless the user 
 
 ## Commit rules
 
+- Commit only for accepted review-driven code fixes
+- Do not commit on a time-based cadence or merely because a review invocation happened
+- Use at most one Claude fix commit and one Codex fix commit per pass through the loop, unless Step 5 requires a final Codex fix commit
+- Do not create a commit for review notes, `review.md`, `execution_state.md`, todo updates, or archive bookkeeping alone
 - Never create empty commits
 - Never commit unrelated worktree changes
+- Stage only files within the reviewed phase scope, plus the minimal `.ai/` state files that truthfully record the review result
 - Stage only the intended review-fix files plus the relevant `.ai/` state files when appropriate
 - If unrelated changes make safe staging unclear, stop and ask the user before committing
+- Run the smallest relevant verification before each fix commit
 - After each fix commit, record the commit SHA in `execution_state.md`
 
 ## Required structure for `.ai/plans/<slug>/review.md`
@@ -435,7 +449,7 @@ Rules:
    - `## 7. Final Outcome` in `review.md`
    - `review_notes` in `execution_state.md`
 
-It is acceptable to keep `review.md` as the current active artifact after also archiving its final snapshot.
+It is acceptable to keep `review.md` as the current active artifact after also archiving its final snapshot while the plan remains active. If the whole plan is archived in the same invocation, `review.md` will disappear with the plan directory and the archived snapshot becomes the source of truth.
 
 ## Execution state update rules
 
@@ -468,9 +482,9 @@ After the invocation, report briefly:
 ## File handling
 
 Before finishing:
-1. Ensure `.ai/plans/<slug>/review.md` exists and matches the selected phase
-2. Ensure the review artifact contains all required sections
+1. Ensure `.ai/plans/<slug>/review.md` exists and matches the selected phase, unless the plan itself was archived in this invocation
+2. Ensure the review artifact contains all required sections in the live file or, if the plan was archived in this invocation, in the archived review snapshot
 3. Ensure `execution_state.md` reflects the final review state truthfully
 4. Ensure the final review artifact is archived in `.ai/archive/`
-5. If the review finished the last required phase review for a fully implemented plan, ensure the plan is archived and `plans.md` is updated
+5. If the review finished the last required phase review for a fully implemented plan, ensure the plan is archived, `plans.md` is updated, and the archived review snapshot contains the final outcome
 6. Then provide the short in-chat summary

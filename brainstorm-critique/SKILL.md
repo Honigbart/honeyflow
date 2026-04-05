@@ -1,16 +1,17 @@
 ---
 name: brainstorm-critique
-description: Use this skill when .ai/plans/<slug>/claude_brainstorm.md exists and should be critiqued by Codex CLI as a skeptical external reviewer. Produces .ai/plans/<slug>/codex_critique.md.
+description: Use this skill when a planning artifact in .ai/plans/<slug>/ should be critiqued by Codex CLI as a skeptical external reviewer. Supports both claude_brainstorm.md and evolution_plan.md as input and produces .ai/plans/<slug>/codex_critique.md.
 ---
 
 # Brainstorm Critique Skill
 
-Your job is to use Codex CLI as the critique agent for an existing brainstorm artifact.
+Your job is to use Codex CLI as the critique agent for an existing planning artifact.
 
 ## When to use this skill
 
 Use this skill when:
-- `.ai/plans/<slug>/claude_brainstorm.md` already exists
+- `.ai/plans/<slug>/claude_brainstorm.md` already exists, or
+- `.ai/plans/<slug>/evolution_plan.md` already exists
 - the user wants a critique, second opinion, pressure test, or adversarial review
 - the critique should come from Codex, not from Claude alone
 
@@ -55,7 +56,7 @@ All pipeline skills operate on **namespaced plans**. Each plan has a unique slug
 - `execute-review` finishing the last required phase review → copies plan dir to `.ai/archive/<slug>/`, deletes `.ai/plans/<slug>/`, sets status to `completed`.
 - `evolve` creates a NEW plan slug + directory referencing a previous plan. Writes `evolution_plan.md` in the new directory.
 
-**This skill's state responsibility:** Read `.ai/plans/<slug>/claude_brainstorm.md`, write `.ai/plans/<slug>/codex_critique.md`. This skill does **not** read or modify plan state files (`final_plan.md`, `execution_state.md`).
+**This skill's state responsibility:** Read one planning input artifact from `.ai/plans/<slug>/` (`claude_brainstorm.md` or `evolution_plan.md`), write `.ai/plans/<slug>/codex_critique.md`. This skill does **not** read or modify plan state files (`final_plan.md`, `execution_state.md`).
 
 ## Legacy layout detection
 
@@ -71,7 +72,7 @@ Every invocation must resolve a plan slug before doing work.
 
 1. If the user provided a slug explicitly (e.g., `/brainstorm-critique auth-rewrite`), use it.
 2. If not, read `.ai/plans.md`.
-3. Filter to plans with status `brainstorming` that have a `claude_brainstorm.md` in their directory.
+3. Filter to plans with status `brainstorming` that have a planning input artifact (`claude_brainstorm.md` or `evolution_plan.md`) in their directory.
 4. If exactly one plan matches, use it silently.
 5. If zero match, say so clearly and stop.
 6. If multiple match, list them and ask the user to choose.
@@ -88,9 +89,12 @@ using Codex CLI as the reviewing agent.
 
 Before starting:
 1. Resolve the plan slug (see above)
-2. Check whether `.ai/plans/<slug>/claude_brainstorm.md` exists
-3. If it does not exist, say so clearly and stop
-4. Ensure the `.ai/plans/<slug>/` directory exists
+2. Determine the critique input source:
+   - **Standard path:** `.ai/plans/<slug>/claude_brainstorm.md`
+   - **Evolution path:** `.ai/plans/<slug>/evolution_plan.md`
+3. If both input files exist, stop and ask the user which artifact should be critiqued. Do not silently pick one.
+4. If neither input file exists, say so clearly and stop.
+5. Ensure the `.ai/plans/<slug>/` directory exists
 
 ## Execution rule
 
@@ -100,14 +104,16 @@ Instead, invoke Codex CLI through the shell and save its output to `.ai/plans/<s
 
 ## Preferred shell command
 
-Run this command (substitute the resolved slug):
+Run this command (substitute the resolved slug and input filename):
 
 ```bash
 mkdir -p .ai/plans/<slug> && \
-cat .ai/plans/<slug>/claude_brainstorm.md | codex exec -C . --skip-git-repo-check \
+cat .ai/plans/<slug>/<input-file> | codex exec -C . --skip-git-repo-check \
   --output-last-message .ai/plans/<slug>/codex_critique.md \
   "You are a skeptical principal engineer and product critic.
-Critique this brainstorm aggressively.
+Critique this planning artifact aggressively.
+
+If the artifact is an evolution plan, critique it as a grounded v2 proposal rather than as greenfield brainstorming.
 
 Focus on:
 1. weak assumptions
@@ -130,7 +136,7 @@ After Codex finishes:
 2. Confirm it is substantive and not empty
 3. Give a short in-chat summary of:
    - biggest weakness
-   - strongest surviving direction
+   - strongest surviving direction or recommendation
 
 ## Validation rules
 
@@ -142,10 +148,24 @@ If the critique is weak or clearly failed, say so instead of pretending it succe
 
 ## Fallback rule
 
-If Codex CLI is unavailable or the shell command fails:
+Codex has priority for this skill. Always attempt the Codex critique first for each invocation. Never assume an earlier usage-limit failure is still in effect.
+
+If Codex CLI is unavailable or the shell command fails in the current invocation:
 - say clearly that Codex could not be invoked
+- include the actual failure reason when known, for example usage limit, quota, rate limit, auth failure, or process error
 - do not pretend Codex reviewed it
 - ask whether Claude should produce a temporary critique instead
+
+If the user explicitly approves a temporary Claude fallback:
+- Claude may produce the critique for this invocation only
+- write it to `.ai/plans/<slug>/codex_critique.md` so the downstream pipeline can continue
+- prepend a clear provenance note stating that this file was generated by Claude as a temporary fallback because Codex failed in this invocation, including the failure reason if known
+- keep the rest of the file as a real critique artifact, not filler
+
+If the user does not explicitly approve the fallback:
+- stop without creating or changing `codex_critique.md`
+
+If a future invocation can reach Codex again, prefer Codex and overwrite the temporary Claude fallback critique with a real Codex critique.
 
 ## Style rules
 
@@ -157,6 +177,8 @@ If Codex CLI is unavailable or the shell command fails:
 ## File handling
 
 Before finishing:
-1. Ensure `.ai/plans/<slug>/codex_critique.md` exists if Codex succeeded
+1. Ensure `.ai/plans/<slug>/codex_critique.md` exists if Codex succeeded or the user explicitly approved the temporary Claude fallback
 2. Ensure it contains meaningful markdown and is not just whitespace
-3. Then provide a short in-chat summary of the result
+3. Ensure the critique clearly matches the selected input artifact
+4. If Claude fallback was used, ensure the provenance note is explicit and truthful
+5. Then provide a short in-chat summary of the result

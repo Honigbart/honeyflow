@@ -75,12 +75,17 @@ This skill creates new plans. Resolution works as follows:
 1. If the user provided a slug explicitly (e.g., `/brainstorm auth-rewrite`), use it.
 2. If not, after the brainstorming discussion, derive a slug from the topic: kebab-case, 2-4 words, no dates.
 3. Confirm the slug with the user before creating the directory.
-4. Create `.ai/plans/<slug>/` directory.
-5. Add an entry to `.ai/plans.md` with status `brainstorming` (create the file if it doesn't exist).
+4. Apply the collision and consistency rules below before creating or overwriting anything.
+5. Create `.ai/plans/<slug>/` directory.
+6. Add an entry to `.ai/plans.md` with status `brainstorming` (create the file if it doesn't exist).
 
 If `.ai/plans.md` already contains a plan with the same slug in `brainstorming` status, this is a re-brainstorm for that plan. Overwrite the existing `claude_brainstorm.md` in that directory instead of creating a new one.
 
-If the slug matches an `active` plan, warn the user — brainstorming over an active plan is unusual. Ask whether to proceed (overwrite the brainstorm) or choose a different slug.
+If the same slug already exists with status `active`, `completed`, or `abandoned`, do **not** reuse it for brainstorm. Reusing a non-brainstorming slug can mix new ideation artifacts with an existing `final_plan.md`, `execution_state.md`, `session_log.md`, or archived plan history. Ask the user to choose a different slug instead. If they want to build on an already implemented plan, prefer `evolve` so the prior plan remains intact.
+
+Never change an existing non-`brainstorming` plan entry back to `brainstorming` as part of this skill.
+
+If a supposedly `brainstorming` plan directory already contains `final_plan.md` or `execution_state.md`, stop and report the mixed state instead of overwriting anything. That directory is already inconsistent and must be resolved intentionally.
 
 ## Primary objective
 
@@ -286,6 +291,8 @@ When brainstorming for an existing project:
 After writing `.ai/plans/<slug>/claude_brainstorm.md`, check whether `.ai/plans/<slug>/codex_critique.md` exists. If it does, **delete it** — it critiques a previous brainstorm and is now stale. The user must re-run `brainstorm-critique` to generate a fresh critique for the new brainstorm.
 
 Also check whether `.ai/plans/<slug>/evolution_plan.md` exists. If it does, treat it as stale for this new brainstorm cycle. Prefer **moving** it to `.ai/archive/` with a date-prefixed filename such as `YYYYMMDD-<slug>-stale-evolution-plan.md`. If archiving is not practical, say so clearly and delete it only as a fallback.
+
+Do not delete or rewrite `final_plan.md`, `execution_state.md`, or `session_log.md` here. If those files exist for this slug, stop and surface the inconsistency instead of trying to clean it up automatically.
 
 Mention the stale artifact cleanup in the in-chat summary so the user knows critique and evolution artifacts from the prior cycle were retired.
 

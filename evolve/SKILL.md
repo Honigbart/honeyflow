@@ -96,8 +96,17 @@ Read whichever location has the artifacts.
 1. If the user provided a new slug, use it.
 2. Otherwise, derive one from the source slug + the evolution topic. For example: `auth-rewrite-v2`, `monitoring-observability`, or `ui-dark-mode`.
 3. Confirm the slug with the user before creating the directory.
-4. Create `.ai/plans/<new-slug>/` directory.
-5. Add an entry to `.ai/plans.md` with status `brainstorming`.
+4. Apply the collision and consistency rules below before creating or overwriting anything.
+5. Create `.ai/plans/<new-slug>/` directory.
+6. Add an entry to `.ai/plans.md` with status `brainstorming`.
+
+The new slug must be distinct from the source slug.
+
+If `.ai/plans.md` already contains the new slug in `brainstorming` status, and `.ai/plans/<new-slug>/` contains `evolution_plan.md` but does **not** contain `final_plan.md` or `execution_state.md`, treat this as a re-evolve for the same unfinished evolution plan and overwrite only `evolution_plan.md`.
+
+If the new slug already exists with status `active`, `completed`, or `abandoned`, or if `.ai/archive/<new-slug>/` already exists, do **not** reuse it. Choose a different slug. Never overwrite an archived plan namespace or a live execution namespace during evolve.
+
+If a supposedly reusable `brainstorming` new-slug directory already contains `final_plan.md` or `execution_state.md`, stop and report the mixed state instead of overwriting anything.
 
 ## Primary objective
 

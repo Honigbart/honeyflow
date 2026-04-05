@@ -199,12 +199,21 @@ On each invocation, do the following in order:
 - If partial progress was made, keep it in progress
 - If blocked, mark it blocked and explain exactly why
 
-5. Update durable records
+5. Commit checkpoint when appropriate
+- Prefer creating a git commit when the session ends in a coherent, revertable state with substantive implementation progress
+- Always commit when a phase is completed and verified
+- Prefer committing before or after a risky refactor, migration step, or other change that would be painful to unwind manually
+- If work remains partial, commit only if the intermediate state is still coherent, tested as far as practical, and worth preserving
+- Do not commit noisy thrash, broken exploratory states, or unrelated worktree changes
+- Stage only the intended implementation files plus relevant `.ai/` state files when appropriate
+- Use clear non-interactive commit messages tied to the phase, for example: `Execute plan <slug> phase 2: add prompt composer validation`
+
+6. Update durable records
 - Update `.ai/plans/<slug>/execution_state.md`
 - Append a concise entry to `.ai/plans/<slug>/session_log.md`
 - Keep both files truthful and current
 
-6. Report clearly in chat
+7. Report clearly in chat
 - say which phase you worked on
 - what changed
 - whether the phase is now done, still in progress, or blocked
@@ -307,6 +316,7 @@ Use this structure for each new entry:
 - actions taken:
 - files touched:
 - verification performed:
+- commits:
 - status after session:
 - blockers:
 - next starting point:
@@ -320,6 +330,13 @@ When executing a phase:
 - validate with tests, builds, or local checks when appropriate
 - update docs when implementation meaningfully changes behavior
 - keep the execution record synchronized with reality
+
+Commit discipline:
+- prefer at least one commit for substantive finished work in a session
+- if no commit was made, state why in `session_log.md`
+- if a commit was made, record the commit SHA and short message in `session_log.md`
+- never commit unrelated dirty changes
+- avoid time-based or cadence-based commits; commit at stable checkpoints instead
 
 If you cannot finish a phase in the current session:
 - leave it as `in progress`
