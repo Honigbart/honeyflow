@@ -1,6 +1,6 @@
 ---
 name: brainstorm-critique
-description: Use this skill when .ai/claude_brainstorm.md exists and should be critiqued by Codex CLI as a skeptical external reviewer. Produces .ai/codex_critique.md.
+description: Use this skill when .ai/plans/<slug>/claude_brainstorm.md exists and should be critiqued by Codex CLI as a skeptical external reviewer. Produces .ai/plans/<slug>/codex_critique.md.
 ---
 
 # Brainstorm Critique Skill
@@ -10,7 +10,7 @@ Your job is to use Codex CLI as the critique agent for an existing brainstorm ar
 ## When to use this skill
 
 Use this skill when:
-- `.ai/claude_brainstorm.md` already exists
+- `.ai/plans/<slug>/claude_brainstorm.md` already exists
 - the user wants a critique, second opinion, pressure test, or adversarial review
 - the critique should come from Codex, not from Claude alone
 
@@ -29,61 +29,83 @@ This skill is **step 2 of 5** in a planning pipeline:
 1. brainstorm → 2. brainstorm-critique → 3. brainstorm-synthesize → 4. execute-plan → 5. evolve
 ```
 
-All five skills share a canonical file layout and state model.
+All pipeline skills operate on **namespaced plans**. Each plan has a unique slug and its own directory.
 
-**Canonical files**
-- `.ai/final_plan.md` — active plan, or a status stub when no plan is active
-- `.ai/execution_state.md` — execution progress for the active plan
-- `.ai/session_log.md` — chronological history across execution sessions
-- `.ai/archive/` — completed, superseded, or abandoned plans
-- `.ai/plans/in_progress/` — paused plans that may resume
-- `.ai/evolution_plan.md` — evolution proposal artifact; not active until confirmed
-- `.ai/claude_brainstorm.md` — current brainstorm artifact
-- `.ai/codex_critique.md` — current critique artifact
+**Directory layout**
+- `.ai/plans.md` — index of all plans with slug, status, and description
+- `.ai/plans/<slug>/` — all artifacts for a specific plan
+- `.ai/plans/<slug>/final_plan.md` — the plan
+- `.ai/plans/<slug>/execution_state.md` — execution progress
+- `.ai/plans/<slug>/session_log.md` — session history
+- `.ai/plans/<slug>/claude_brainstorm.md` — brainstorm artifact
+- `.ai/plans/<slug>/codex_critique.md` — critique artifact
+- `.ai/plans/<slug>/evolution_plan.md` — evolution proposal
+- `.ai/plans/<slug>/review.md` — active review artifact
+- `.ai/archive/` — completed, abandoned, or superseded plan artifacts
+- `.ai/todo.md` — project-level todo list (global, not per-plan)
 
-**Plan states:** `active` · `paused` (in `plans/in_progress/`) · `superseded` (in `archive/`) · `completed` (in `archive/`) · `abandoned` (in `archive/`)
+**Plan statuses** (tracked in `.ai/plans.md`): `brainstorming` · `active` · `completed` · `abandoned`
 
 **Phase states:** `not started` · `in progress` · `blocked` · `done` · `cancelled`
 
 **Key transition rules**
-- `brainstorm` preserves any active plan as `paused` in `.ai/plans/in_progress/`. It does **not** write a new `final_plan.md`.
-- `brainstorm-synthesize` is the only skill that writes a new active `.ai/final_plan.md`.
-- `execute-plan` creates or resets `.ai/execution_state.md` for the active plan.
-- `execute-plan` completing all implementation phases does **not** by itself archive the plan. The plan remains active until required phase reviews are complete.
-- `execute-review` finishing the last required phase review for a fully implemented plan → archive plan to `.ai/archive/`, mark `execution_state.md` as completed, leave completed stub in `final_plan.md`.
-- `evolve` writes `.ai/evolution_plan.md` as a proposal artifact only. Not active until user confirms and synthesizes or executes directly.
+- `brainstorm` creates a new plan slug and directory. Writes `claude_brainstorm.md` inside it. Sets status to `brainstorming` in `plans.md`.
+- `brainstorm-synthesize` is the only skill that writes `final_plan.md` inside a plan directory. Transitions status to `active`.
+- `execute-plan` creates or resets `execution_state.md` for the plan.
+- `execute-review` finishing the last required phase review → copies plan dir to `.ai/archive/<slug>/`, deletes `.ai/plans/<slug>/`, sets status to `completed`.
+- `evolve` creates a NEW plan slug + directory referencing a previous plan. Writes `evolution_plan.md` in the new directory.
 
-**This skill's state responsibility:** Read `.ai/claude_brainstorm.md`, write `.ai/codex_critique.md`. This skill does **not** read or modify plan state files (`final_plan.md`, `execution_state.md`).
+**This skill's state responsibility:** Read `.ai/plans/<slug>/claude_brainstorm.md`, write `.ai/plans/<slug>/codex_critique.md`. This skill does **not** read or modify plan state files (`final_plan.md`, `execution_state.md`).
+
+## Legacy layout detection
+
+Before doing any work, check for a legacy (pre-namespace) layout:
+
+If `.ai/final_plan.md` exists at root AND `.ai/plans.md` does not exist, this is a legacy layout.
+Stop and suggest: "Run `/plan-migrate` to upgrade to the namespaced plan layout."
+Do not proceed with the legacy layout.
+
+## Plan slug resolution
+
+Every invocation must resolve a plan slug before doing work.
+
+1. If the user provided a slug explicitly (e.g., `/brainstorm-critique auth-rewrite`), use it.
+2. If not, read `.ai/plans.md`.
+3. Filter to plans with status `brainstorming` that have a `claude_brainstorm.md` in their directory.
+4. If exactly one plan matches, use it silently.
+5. If zero match, say so clearly and stop.
+6. If multiple match, list them and ask the user to choose.
 
 ## Primary objective
 
 Create or overwrite:
 
-`.ai/codex_critique.md`
+`.ai/plans/<slug>/codex_critique.md`
 
 using Codex CLI as the reviewing agent.
 
 ## Preconditions
 
 Before starting:
-1. Check whether `.ai/claude_brainstorm.md` exists
-2. If it does not exist, say so clearly and stop
-3. Ensure the `.ai` directory exists
+1. Resolve the plan slug (see above)
+2. Check whether `.ai/plans/<slug>/claude_brainstorm.md` exists
+3. If it does not exist, say so clearly and stop
+4. Ensure the `.ai/plans/<slug>/` directory exists
 
 ## Execution rule
 
 Do not write the critique yourself unless Codex CLI is unavailable or the shell command fails.
 
-Instead, invoke Codex CLI through the shell and save its output to `.ai/codex_critique.md`.
+Instead, invoke Codex CLI through the shell and save its output to `.ai/plans/<slug>/codex_critique.md`.
 
 ## Preferred shell command
 
-Run this command:
+Run this command (substitute the resolved slug):
 
 ```bash
-mkdir -p .ai && \
-cat .ai/claude_brainstorm.md | codex exec -C . --skip-git-repo-check \
-  --output-last-message .ai/codex_critique.md \
+mkdir -p .ai/plans/<slug> && \
+cat .ai/plans/<slug>/claude_brainstorm.md | codex exec -C . --skip-git-repo-check \
+  --output-last-message .ai/plans/<slug>/codex_critique.md \
   "You are a skeptical principal engineer and product critic.
 Critique this brainstorm aggressively.
 
@@ -99,12 +121,12 @@ Focus on:
 Return only markdown."
 ```
 
-This form is preferred because `--output-last-message` writes the final assistant message directly to `.ai/codex_critique.md` instead of relying on raw stdout redirection.
+This form is preferred because `--output-last-message` writes the final assistant message directly to `.ai/plans/<slug>/codex_critique.md` instead of relying on raw stdout redirection.
 
 ## After execution
 
 After Codex finishes:
-1. Read `.ai/codex_critique.md`
+1. Read `.ai/plans/<slug>/codex_critique.md`
 2. Confirm it is substantive and not empty
 3. Give a short in-chat summary of:
    - biggest weakness
@@ -135,6 +157,6 @@ If Codex CLI is unavailable or the shell command fails:
 ## File handling
 
 Before finishing:
-1. Ensure `.ai/codex_critique.md` exists if Codex succeeded
+1. Ensure `.ai/plans/<slug>/codex_critique.md` exists if Codex succeeded
 2. Ensure it contains meaningful markdown and is not just whitespace
 3. Then provide a short in-chat summary of the result

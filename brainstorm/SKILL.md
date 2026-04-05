@@ -1,6 +1,6 @@
 ---
 name: brainstorm
-description: Use this skill when the user wants structured ideation for a new or existing project, including feature ideas, rebuilds, refactors, workflow changes, product directions, and project-aware brainstorming that should produce a critique-ready artifact at .ai/claude_brainstorm.md.
+description: Use this skill when the user wants structured ideation for a new or existing project, including feature ideas, rebuilds, refactors, workflow changes, product directions, and project-aware brainstorming that should produce a critique-ready artifact at .ai/plans/<slug>/claude_brainstorm.md.
 ---
 
 # Brainstorm Skill
@@ -32,37 +32,61 @@ This skill is **step 1 of 5** in a planning pipeline:
 1. brainstorm → 2. brainstorm-critique → 3. brainstorm-synthesize → 4. execute-plan → 5. evolve
 ```
 
-All five skills share a canonical file layout and state model.
+All pipeline skills operate on **namespaced plans**. Each plan has a unique slug and its own directory.
 
-**Canonical files**
-- `.ai/final_plan.md` — active plan, or a status stub when no plan is active
-- `.ai/execution_state.md` — execution progress for the active plan
-- `.ai/session_log.md` — chronological history across execution sessions
-- `.ai/archive/` — completed, superseded, or abandoned plans
-- `.ai/plans/in_progress/` — paused plans that may resume
-- `.ai/evolution_plan.md` — evolution proposal artifact; not active until confirmed
-- `.ai/claude_brainstorm.md` — current brainstorm artifact
-- `.ai/codex_critique.md` — current critique artifact
+**Directory layout**
+- `.ai/plans.md` — index of all plans with slug, status, and description
+- `.ai/plans/<slug>/` — all artifacts for a specific plan
+- `.ai/plans/<slug>/final_plan.md` — the plan
+- `.ai/plans/<slug>/execution_state.md` — execution progress
+- `.ai/plans/<slug>/session_log.md` — session history
+- `.ai/plans/<slug>/claude_brainstorm.md` — brainstorm artifact
+- `.ai/plans/<slug>/codex_critique.md` — critique artifact
+- `.ai/plans/<slug>/evolution_plan.md` — evolution proposal
+- `.ai/plans/<slug>/review.md` — active review artifact
+- `.ai/archive/` — completed, abandoned, or superseded plan artifacts
+- `.ai/todo.md` — project-level todo list (global, not per-plan)
 
-**Plan states:** `active` · `paused` (in `plans/in_progress/`) · `superseded` (in `archive/`) · `completed` (in `archive/`) · `abandoned` (in `archive/`)
+**Plan statuses** (tracked in `.ai/plans.md`): `brainstorming` · `active` · `completed` · `abandoned`
 
 **Phase states:** `not started` · `in progress` · `blocked` · `done` · `cancelled`
 
 **Key transition rules**
-- `brainstorm` preserves any active plan as `paused` in `.ai/plans/in_progress/`. It does **not** write a new `final_plan.md`.
-- `brainstorm-synthesize` is the only skill that writes a new active `.ai/final_plan.md`.
-- `execute-plan` creates or resets `.ai/execution_state.md` for the active plan.
-- `execute-plan` completing all implementation phases does **not** by itself archive the plan. The plan remains active until required phase reviews are complete.
-- `execute-review` finishing the last required phase review for a fully implemented plan → archive plan to `.ai/archive/`, mark `execution_state.md` as completed, leave completed stub in `final_plan.md`.
-- `evolve` writes `.ai/evolution_plan.md` as a proposal artifact only. Not active until user confirms and synthesizes or executes directly.
+- `brainstorm` creates a new plan slug and directory. Writes `claude_brainstorm.md` inside it. Sets status to `brainstorming` in `plans.md`.
+- `brainstorm-synthesize` is the only skill that writes `final_plan.md` inside a plan directory. Transitions status to `active`.
+- `execute-plan` creates or resets `execution_state.md` for the plan.
+- `execute-review` finishing the last required phase review → copies plan dir to `.ai/archive/<slug>/`, deletes `.ai/plans/<slug>/`, sets status to `completed`.
+- `evolve` creates a NEW plan slug + directory referencing a previous plan. Writes `evolution_plan.md` in the new directory.
 
-**This skill's state responsibility:** Produce `.ai/claude_brainstorm.md`. Preserve any active plan as `paused` (see section "Handling an Existing Unfinished Plan"). Do not write or modify `final_plan.md`.
+**This skill's state responsibility:** Create a new plan slug and directory. Produce `.ai/plans/<slug>/claude_brainstorm.md`. Add an entry to `.ai/plans.md` with status `brainstorming`.
+
+## Legacy layout detection
+
+Before doing any work, check for a legacy (pre-namespace) layout:
+
+If `.ai/final_plan.md` exists at root AND `.ai/plans.md` does not exist, this is a legacy layout.
+Stop and suggest: "Run `/plan-migrate` to upgrade to the namespaced plan layout."
+Do not proceed with the legacy layout.
+
+## Plan slug resolution
+
+This skill creates new plans. Resolution works as follows:
+
+1. If the user provided a slug explicitly (e.g., `/brainstorm auth-rewrite`), use it.
+2. If not, after the brainstorming discussion, derive a slug from the topic: kebab-case, 2-4 words, no dates.
+3. Confirm the slug with the user before creating the directory.
+4. Create `.ai/plans/<slug>/` directory.
+5. Add an entry to `.ai/plans.md` with status `brainstorming` (create the file if it doesn't exist).
+
+If `.ai/plans.md` already contains a plan with the same slug in `brainstorming` status, this is a re-brainstorm for that plan. Overwrite the existing `claude_brainstorm.md` in that directory instead of creating a new one.
+
+If the slug matches an `active` plan, warn the user — brainstorming over an active plan is unusual. Ask whether to proceed (overwrite the brainstorm) or choose a different slug.
 
 ## Primary objective
 
 After discussing and brainstorming with the user, create a high-quality brainstorming document at:
 
-`.ai/claude_brainstorm.md`
+`.ai/plans/<slug>/claude_brainstorm.md`
 
 The document should be useful as input for:
 - Codex critique
@@ -71,11 +95,11 @@ The document should be useful as input for:
 
 ## Output requirements
 
-Always create or overwrite `.ai/claude_brainstorm.md`.
+Always create or overwrite `.ai/plans/<slug>/claude_brainstorm.md`.
 
 Also present a short summary in chat, but the full artifact belongs in the file.
 
-If the `.ai` directory does not exist, create it.
+If the `.ai/plans/<slug>/` directory does not exist, create it (and `.ai/plans/` if needed).
 
 ## Todo-aware context
 
@@ -118,14 +142,14 @@ Push for:
 - monetization or usefulness if relevant
 
 Avoid:
-- generic startup clichés
+- generic startup cliches
 - empty enthusiasm
 - pretending uncertainty does not exist
 - locking in one idea too early
 - implementation detail overload unless it materially affects direction
 - proposing a full rewrite unless there is a strong reason
 
-## Required structure for `.ai/claude_brainstorm.md`
+## Required structure for `.ai/plans/<slug>/claude_brainstorm.md`
 
 Use exactly these top-level sections:
 
@@ -226,7 +250,7 @@ If no todo items are relevant, omit this section entirely.
 
 - Prefer strong distinctions over vague overlap
 - Name tradeoffs explicitly
-- If the user’s idea is weak, say so constructively
+- If the user's idea is weak, say so constructively
 - If multiple directions are viable, rank them
 - If the idea is premature, shape it before narrowing it
 - Surface unknowns instead of inventing certainty
@@ -259,75 +283,20 @@ When brainstorming for an existing project:
 
 ## Stale artifact cleanup
 
-After writing `.ai/claude_brainstorm.md`, check whether `.ai/codex_critique.md` exists. If it does, **delete it** — it critiques a previous brainstorm and is now stale. The user must re-run `brainstorm-critique` to generate a fresh critique for the new brainstorm.
+After writing `.ai/plans/<slug>/claude_brainstorm.md`, check whether `.ai/plans/<slug>/codex_critique.md` exists. If it does, **delete it** — it critiques a previous brainstorm and is now stale. The user must re-run `brainstorm-critique` to generate a fresh critique for the new brainstorm.
 
-Also check whether `.ai/evolution_plan.md` exists. If it does, treat it as stale for this new brainstorm cycle. Do **not** silently leave it in place where it can confuse later synthesis. Prefer **moving** it to `.ai/archive/` (create the archive directory if needed) with a date-prefixed filename such as `YYYYMMDD-stale-evolution-plan.md`. If archiving is not practical, say so clearly and delete it only as a fallback.
+Also check whether `.ai/plans/<slug>/evolution_plan.md` exists. If it does, treat it as stale for this new brainstorm cycle. Prefer **moving** it to `.ai/archive/` with a date-prefixed filename such as `YYYYMMDD-<slug>-stale-evolution-plan.md`. If archiving is not practical, say so clearly and delete it only as a fallback.
 
 Mention the stale artifact cleanup in the in-chat summary so the user knows critique and evolution artifacts from the prior cycle were retired.
 
 ## File handling
 
 Before finishing:
-1. Ensure `.ai/claude_brainstorm.md` exists
+1. Ensure `.ai/plans/<slug>/claude_brainstorm.md` exists
 2. Ensure it contains all required sections
 3. Ensure the "Codex Critique Handoff" section is present
 4. If this is an existing project, ensure "Current State / Existing Context", "System Fit", and "Migration / Refactor Considerations" are substantive
-5. Delete `.ai/codex_critique.md` if it exists (stale from prior brainstorm)
-6. Move stale `.ai/evolution_plan.md` to `.ai/archive/` if it exists, creating `.ai/archive/` first if needed
-7. Then provide a short in-chat summary of the recommended direction and biggest risk
-
-## Handling an Existing Unfinished Plan
-
-Before starting a new brainstorm, check whether `.ai/final_plan.md` already exists and whether it represents an unfinished active plan.
-
-If there is no active unfinished plan:
-- proceed normally
-
-Treat `.ai/final_plan.md` as an inactive status stub if any of these are true:
-- it begins with `# Final Plan Status`
-- it contains `- active_plan: none`
-- it records `- status: completed` or `- status: abandoned`
-
-A completed or abandoned status stub in `.ai/final_plan.md` does not qualify as an active plan — proceed normally without preserving anything.
-
-If there is a genuinely active or in-progress plan:
-- do not overwrite it silently
-- move the current plan before proceeding
-
-Move it by:
-1. creating `.ai/plans/in_progress/` if needed
-2. **moving** (not copying) `.ai/final_plan.md` into `.ai/plans/in_progress/` — the original must no longer exist at `.ai/final_plan.md`
-3. using a filename that contains:
-   - the date in `YYYYMMDD` format
-   - a short kebab-case summary of the plan
-   - the suffix `-paused`
-
-Example:
-`20260403-new-prompt-ui-paused.md`
-
-If `.ai/execution_state.md` exists **and** reflects an active or in-progress plan (not a completed or abandoned state), also **move** it to `.ai/plans/in_progress/` with a matching filename:
-`20260403-new-prompt-ui-paused.execution_state.md`
-
-Delete the originals from `.ai/` after moving. Do not leave stale copies at `.ai/final_plan.md` or `.ai/execution_state.md`.
-
-### After moving the active plan
-
-- confirm `.ai/final_plan.md` no longer exists (or is gone from the active location)
-- confirm `.ai/execution_state.md` no longer exists at root (if it was moved)
-- then proceed with the new brainstorm
-
-Prepend a status note to the moved plan file. The note should state:
-- that the plan was paused
-- reason: new brainstorm started
-- paused_on: YYYY-MM-DD
-
-Example status note:
-```markdown
-# Plan Status
-
-This plan has been paused.
-
-- status: paused
-- paused_on: 2026-04-26
-- reason: new brainstorm started
-```
+5. Delete `.ai/plans/<slug>/codex_critique.md` if it exists (stale from prior brainstorm)
+6. Move stale `.ai/plans/<slug>/evolution_plan.md` to `.ai/archive/` if it exists
+7. Ensure `.ai/plans.md` has an entry for this slug with status `brainstorming`
+8. Then provide a short in-chat summary of the recommended direction and biggest risk

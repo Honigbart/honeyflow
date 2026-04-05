@@ -95,19 +95,21 @@ When the user describes multiple changes at once, apply them all in a single fil
 
 ## Integration with the brainstorm pipeline
 
-The todo list participates in the brainstorm → synthesize → execute → review pipeline:
+The todo list participates in the brainstorm → synthesize → execute → review pipeline (all plans are namespaced under `.ai/plans/<slug>/`):
 
-1. **brainstorm** reads `.ai/todo.md` and uses **Now**/**Next** items as context. If the brainstorm addresses specific items, it lists them in a `## 17. Todo Context` section in `claude_brainstorm.md`.
-2. **brainstorm-synthesize** carries those references into `final_plan.md` as `## 15. Todo References`.
-3. **execute-review**, when it archives a fully completed and reviewed plan, reads `## 15. Todo References` from `final_plan.md` and marks those items as done in `.ai/todo.md`.
+1. **brainstorm** reads `.ai/todo.md` and uses **Now**/**Next** items as context. If the brainstorm addresses specific items, it lists them in a `## 17. Todo Context` section in `.ai/plans/<slug>/claude_brainstorm.md`.
+2. **brainstorm-synthesize** carries those references into `.ai/plans/<slug>/final_plan.md` as `## 15. Todo References`.
+3. **execute-review**, when it archives a fully completed and reviewed plan, reads `## 15. Todo References` from the plan's `final_plan.md` and marks those items as done in `.ai/todo.md`.
 
 This means: if a todo item triggers a brainstorm and makes it all the way through execution and review, it gets auto-completed at the end. No manual cleanup needed.
 
 ## Integration with execute-plan
 
-When `execute-plan` is active (`.ai/execution_state.md` exists with an in-progress plan):
-- "What's next" should show both the current execution phase AND the todo list, so the user sees the full picture.
-- Present the execution phase first, then the todo list as additional context.
+When active plans exist (check `.ai/plans.md` for plans with status `active`):
+- "What's next" should show active plan execution phases AND the todo list, so the user sees the full picture.
+- For each active plan, read `.ai/plans/<slug>/execution_state.md` and show the current phase.
+- If multiple plans are active, show all of them with their slugs as headers.
+- Present execution phases first, then the todo list as additional context.
 
 ## Style rules
 

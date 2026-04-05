@@ -1,6 +1,6 @@
 ---
 name: evolve
-description: Use this skill when an implemented feature, module, workflow, MVP, or product already exists and should be evolved toward a stronger next version without drifting into an unjustified rewrite. Works for both greenfield MVPs that completed a plan cycle and specific feature/module improvements. Produces .ai/evolution_plan.md with a project-aware assessment, high-leverage improvements, phased roadmap, and concrete next steps.
+description: Use this skill when an implemented feature, module, workflow, MVP, or product already exists and should be evolved toward a stronger next version without drifting into an unjustified rewrite. Works for both greenfield MVPs that completed a plan cycle and specific feature/module improvements. Creates a NEW plan slug referencing the source plan and produces .ai/plans/<new-slug>/evolution_plan.md with a project-aware assessment, high-leverage improvements, phased roadmap, and concrete next steps.
 ---
 
 # Evolve Skill
@@ -36,39 +36,76 @@ This skill is **step 5 of 5** in a planning pipeline:
 1. brainstorm → 2. brainstorm-critique → 3. brainstorm-synthesize → 4. execute-plan → 5. evolve
 ```
 
-All five skills share a canonical file layout and state model.
+All pipeline skills operate on **namespaced plans**. Each plan has a unique slug and its own directory.
 
-**Canonical files**
-- `.ai/final_plan.md` — active plan, or a status stub when no plan is active
-- `.ai/execution_state.md` — execution progress for the active plan
-- `.ai/session_log.md` — chronological history across execution sessions
-- `.ai/archive/` — completed, superseded, or abandoned plans
-- `.ai/plans/in_progress/` — paused plans that may resume
-- `.ai/evolution_plan.md` — evolution proposal artifact; not active until confirmed
-- `.ai/claude_brainstorm.md` — current brainstorm artifact
-- `.ai/codex_critique.md` — current critique artifact
+**Directory layout**
+- `.ai/plans.md` — index of all plans with slug, status, and description
+- `.ai/plans/<slug>/` — all artifacts for a specific plan
+- `.ai/plans/<slug>/final_plan.md` — the plan
+- `.ai/plans/<slug>/execution_state.md` — execution progress
+- `.ai/plans/<slug>/session_log.md` — session history
+- `.ai/plans/<slug>/claude_brainstorm.md` — brainstorm artifact
+- `.ai/plans/<slug>/codex_critique.md` — critique artifact
+- `.ai/plans/<slug>/evolution_plan.md` — evolution proposal
+- `.ai/plans/<slug>/review.md` — active review artifact
+- `.ai/archive/` — completed, abandoned, or superseded plan artifacts
+- `.ai/todo.md` — project-level todo list (global, not per-plan)
 
-**Plan states:** `active` · `paused` (in `plans/in_progress/`) · `superseded` (in `archive/`) · `completed` (in `archive/`) · `abandoned` (in `archive/`)
+**Plan statuses** (tracked in `.ai/plans.md`): `brainstorming` · `active` · `completed` · `abandoned`
 
 **Phase states:** `not started` · `in progress` · `blocked` · `done` · `cancelled`
 
 **Key transition rules**
-- `brainstorm` preserves any active plan as `paused` in `.ai/plans/in_progress/`. It does **not** write a new `final_plan.md`.
-- `brainstorm-synthesize` is the only skill that writes a new active `.ai/final_plan.md`.
-- `execute-plan` creates or resets `.ai/execution_state.md` for the active plan.
-- `execute-plan` completing all implementation phases does **not** by itself archive the plan. The plan remains active until required phase reviews are complete.
-- `execute-review` finishing the last required phase review for a fully implemented plan → archive plan to `.ai/archive/`, mark `execution_state.md` as completed, leave completed stub in `final_plan.md`.
-- `evolve` writes `.ai/evolution_plan.md` as a proposal artifact only. Not active until user confirms and synthesizes or executes directly.
+- `brainstorm` creates a new plan slug and directory. Writes `claude_brainstorm.md` inside it. Sets status to `brainstorming` in `plans.md`.
+- `brainstorm-synthesize` is the only skill that writes `final_plan.md` inside a plan directory. Transitions status to `active`.
+- `execute-plan` creates or resets `execution_state.md` for the plan.
+- `execute-review` finishing the last required phase review → copies plan dir to `.ai/archive/<slug>/`, deletes `.ai/plans/<slug>/`, sets status to `completed`.
+- `evolve` creates a NEW plan slug + directory referencing a previous plan. Writes `evolution_plan.md` in the new directory.
 
-**This skill's state responsibility:** Produce `.ai/evolution_plan.md` as a proposal artifact. Do **not** write or modify `final_plan.md`. Do not start execution. The user must confirm the direction before the pipeline continues.
+**This skill's state responsibility:** Read from a SOURCE plan (active or completed) for context. Create a NEW plan slug and directory. Produce `.ai/plans/<new-slug>/evolution_plan.md` as a proposal artifact. Add an entry to `.ai/plans.md` with status `brainstorming`. Do **not** write or modify `final_plan.md` in either the source or new plan. Do not start execution.
+
+## Legacy layout detection
+
+Before doing any work, check for a legacy (pre-namespace) layout:
+
+If `.ai/final_plan.md` exists at root AND `.ai/plans.md` does not exist, this is a legacy layout.
+Stop and suggest: "Run `/plan-migrate` to upgrade to the namespaced plan layout."
+Do not proceed with the legacy layout.
+
+## Plan slug resolution (dual-slug)
+
+This skill operates with two slugs: a **source** plan to read from and a **new** plan to write to.
+
+### Source plan resolution
+
+1. If the user specified a source plan slug (e.g., `/evolve auth-rewrite`), use it.
+2. If not, read `.ai/plans.md`.
+3. Filter to plans with status `active` or `completed`.
+4. If exactly one matches, use it silently.
+5. If zero match, say so. Evolve requires something already built to evolve.
+6. If multiple match, list them and ask the user which plan to evolve.
+
+The source plan's artifacts may be in:
+- `.ai/plans/<source-slug>/` (if still active)
+- `.ai/archive/<source-slug>/` (if completed and archived)
+
+Read whichever location has the artifacts.
+
+### New plan slug
+
+1. If the user provided a new slug, use it.
+2. Otherwise, derive one from the source slug + the evolution topic. For example: `auth-rewrite-v2`, `monitoring-observability`, or `ui-dark-mode`.
+3. Confirm the slug with the user before creating the directory.
+4. Create `.ai/plans/<new-slug>/` directory.
+5. Add an entry to `.ai/plans.md` with status `brainstorming`.
 
 ## Primary objective
 
 Create a high-quality evolution document at:
 
-`.ai/evolution_plan.md`
+`.ai/plans/<new-slug>/evolution_plan.md`
 
-The document should be useful as input for:
+The document should reference the source plan slug for traceability and be useful as input for:
 - implementation planning
 - a v2 roadmap
 - further critique or synthesis
@@ -77,31 +114,27 @@ The document should be useful as input for:
 ## Preconditions
 
 Before starting:
-1. Look for relevant context, especially:
-   - `.ai/final_plan.md` — if present and active, read as prior plan context; if it contains an inactive status stub, treat it as historical reference only, not an active plan
-   - `.ai/execution_state.md` — useful for understanding what was completed
-   - `.ai/claude_brainstorm.md`
-   - `.ai/codex_critique.md`
-   - existing implementation files
-   - README, architecture notes, task docs, or relevant code
-   An inactive status stub is any `final_plan.md` that:
-   - begins with `# Final Plan Status`
-   - contains `- active_plan: none`
-   - records `- status: completed` or `- status: abandoned`
-2. If the current implementation context is incomplete, say what assumptions you are making
-3. Prefer grounding in the existing project rather than inventing an idealized redesign
-4. Do not modify any plan state files. This skill is read-only with respect to `final_plan.md` and `execution_state.md`.
+1. Resolve source plan slug and new plan slug (see above)
+2. Read the source plan's artifacts for context:
+   - `final_plan.md` — prior plan context
+   - `execution_state.md` — what was completed
+   - `claude_brainstorm.md` — original brainstorm if useful
+   - `codex_critique.md` — prior critique if useful
+   - existing implementation files, README, architecture notes, or relevant code
+3. If the current implementation context is incomplete, say what assumptions you are making
+4. Prefer grounding in the existing project rather than inventing an idealized redesign
+5. Do not modify any files in the source plan's directory. This skill reads from the source, writes only to the new plan directory.
 
 ## Output requirements
 
-Always create or overwrite `.ai/evolution_plan.md`.
+Always create or overwrite `.ai/plans/<new-slug>/evolution_plan.md`.
 
 Also provide a short in-chat summary of:
 - the recommended v2 direction
 - the biggest current weakness
 - the most important next step
 
-If the `.ai` directory does not exist, create it.
+If the `.ai/plans/<new-slug>/` directory does not exist, create it.
 
 ## Core behavior
 
@@ -139,11 +172,14 @@ Avoid:
 - pretending the current implementation does not exist
 - changing too many surfaces at once
 
-## Required structure for `.ai/evolution_plan.md`
+## Required structure for `.ai/plans/<new-slug>/evolution_plan.md`
 
 Use exactly these top-level sections:
 
 # Evolution Plan
+
+## 0. Source Plan
+State the source plan slug and where its artifacts were read from (`.ai/plans/<source-slug>/` or `.ai/archive/<source-slug>/`).
 
 ## 1. Subject Snapshot
 Summarize what is being evolved and its current purpose in 3-6 sentences.
@@ -284,23 +320,24 @@ When evolving an existing project:
 
 ## Next Steps After Evolve
 
-After producing `.ai/evolution_plan.md`, the pipeline continues in one of two ways depending on scope:
+After producing `.ai/plans/<new-slug>/evolution_plan.md`, the pipeline continues in one of two ways depending on scope:
 
 **Option A — Full planning cycle (recommended for larger or uncertain evolutions):**
-Run `brainstorm-synthesize` next. It will read `evolution_plan.md` as the planning input (instead of brainstorm + critique) and produce a new active `final_plan.md`. Then run `execute-plan`.
+Run `brainstorm-synthesize <new-slug>` next. It will read `evolution_plan.md` as the planning input (instead of brainstorm + critique) and produce `final_plan.md` in the same plan directory. Then run `execute-plan <new-slug>`.
 
 **Option B — Direct execution (for smaller, clear evolutions):**
-If the evolution scope is narrow and well-understood, the user may choose to move toward execution immediately after confirming the evolution plan. Even then, do **not** execute directly from `.ai/evolution_plan.md`. First produce or explicitly promote a `.ai/final_plan.md` that reflects the confirmed direction, then run `execute-plan`.
+If the evolution scope is narrow and well-understood, the user may choose to move toward execution immediately after confirming the evolution plan. Even then, do **not** execute directly from `evolution_plan.md`. First produce `final_plan.md` via synthesize, then run `execute-plan`.
 
-Either way, do not start execution from `evolution_plan.md` without first ensuring `final_plan.md` reflects the confirmed direction.
+Either way, do not start execution from `evolution_plan.md` without first ensuring `final_plan.md` exists in the plan directory.
 
 Always surface these two options clearly in the in-chat summary at the end of the skill.
 
 ## File handling
 
 Before finishing:
-1. Ensure `.ai/evolution_plan.md` exists
-2. Ensure it contains all required sections
+1. Ensure `.ai/plans/<new-slug>/evolution_plan.md` exists
+2. Ensure it contains all required sections including `## 0. Source Plan`
 3. Ensure the roadmap phases are substantive and session-sized
 4. Ensure "What Should Stay Untouched" is explicit
-5. Then provide a short in-chat summary of the recommended v2 direction, biggest weakness, and most important next step
+5. Ensure `.ai/plans.md` has an entry for the new slug with status `brainstorming`
+6. Then provide a short in-chat summary of the recommended v2 direction, biggest weakness, and most important next step
