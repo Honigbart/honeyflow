@@ -59,7 +59,26 @@ The skills will be available in your next Claude Code session.
 
 ## How it works
 
-All plans live under `.ai/plans/<slug>/` in your project. Each plan gets its own directory with artifacts like `final_plan.md`, `execution_state.md`, `session_log.md`, and `review.md`. Completed plans are archived to `.ai/archive/<slug>/`.
+All state lives under `.ai/` in your project root:
+
+```
+.ai/
+├── plans.md                        # index of all plans (slug, status, description)
+├── todo.md                         # project todo list (Now / Next / Later / Done)
+├── plans/
+│   └── <slug>/                     # one directory per active plan
+│       ├── final_plan.md           # the executable plan
+│       ├── execution_state.md      # phase-by-phase progress tracker
+│       ├── session_log.md          # chronological session history
+│       ├── claude_brainstorm.md    # brainstorm artifact (full path only)
+│       ├── codex_critique.md       # Codex critique output
+│       ├── evolution_plan.md       # evolution proposal (evolve only)
+│       └── review.md              # active phase review artifact
+└── archive/                        # completed or abandoned plans
+    └── <slug>/                     # full copy of the plan directory at completion
+```
+
+`todo.md` is global, not per-plan. It sits at `.ai/todo.md` and is shared across all plans. Plans reference specific todo items, and those references travel through the pipeline so they can be auto-completed when a plan is archived.
 
 There are two paths into the pipeline:
 
