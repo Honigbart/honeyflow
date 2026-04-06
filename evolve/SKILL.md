@@ -95,9 +95,10 @@ This skill operates with two slugs: a **source** plan to read from and a **new**
 5. If zero match, say so. Evolve requires something already built to evolve.
 6. If multiple match, list them and ask the user which plan to evolve.
 
-The source plan's artifacts may be in:
-- `.ai/plans/<source-slug>/` (if still active)
-- `.ai/archive/<source-slug>/` (if completed and archived)
+After resolving the source slug, verify the artifacts actually exist:
+- Check `.ai/plans/<source-slug>/` first (if the plan is still active)
+- Then check `.ai/archive/<source-slug>/` (if the plan was completed and archived)
+- If neither location contains `final_plan.md` or any planning artifacts, stop and say so. The slug may be misspelled, the plan may have been manually deleted, or it may never have been synthesized.
 
 Read whichever location has the artifacts.
 
@@ -140,9 +141,10 @@ Before starting:
    - `claude_brainstorm.md` — original brainstorm if useful
    - `codex_critique.md` — prior critique if useful
    - existing implementation files, README, architecture notes, or relevant code
-3. If the current implementation context is incomplete, say what assumptions you are making
-4. Prefer grounding in the existing project rather than inventing an idealized redesign
-5. Do not modify any files in the source plan's directory. This skill reads from the source, writes only to the new plan directory.
+3. If `execution_state.md` exists, check whether all phases are `done` and `reviewed`. If the source plan has phases that are `not started`, `in progress`, or `blocked`, warn the user: "The source plan has incomplete phases. Evolving from a partially implemented plan means the evolution will be based on what was built so far, not the full intended scope." Do not block — just make the partial state visible so the user can decide whether to finish the source plan first or proceed with evolution.
+4. If the current implementation context is incomplete, say what assumptions you are making
+5. Prefer grounding in the existing project rather than inventing an idealized redesign
+6. Do not modify any files in the source plan's directory. This skill reads from the source, writes only to the new plan directory.
 
 ## Output requirements
 
@@ -199,6 +201,7 @@ Use exactly these top-level sections:
 
 ## 0. Source Plan
 State the source plan slug and where its artifacts were read from (`.ai/plans/<source-slug>/` or `.ai/archive/<source-slug>/`).
+If the evolution targets specific phases or areas of the source plan rather than the whole plan, list which phases are being evolved and why.
 
 ## 1. Subject Snapshot
 Summarize what is being evolved and its current purpose in 3-6 sentences.

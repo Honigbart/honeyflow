@@ -97,8 +97,9 @@ Process exactly one eligible phase per invocation.
 If finishing that one phase makes the whole plan implementation-complete and review-complete, finalize the plan archive in the same invocation unless the user explicitly says not to.
 
 Default selection rule:
-1. If a phase already has `review_status: in review`, `claude-fixed`, or `codex-fixed`, resume that phase.
-2. Otherwise select the earliest phase in order with:
+1. If a phase already has `review_status: in review`, `claude-fixed`, or `codex-fixed`, resume that phase. **Only one phase may be in an active review state at a time.** If multiple phases have active review statuses, stop and surface the inconsistency — this indicates a prior session crashed mid-review. Resume the earliest one.
+2. If a phase has `review_status: in disagreement`, it is eligible for re-review. Present the prior disagreement details from `review_notes` to the user and ask whether to re-run the review loop (which may resolve it with a fresh Codex invocation) or accept the current state and move on.
+3. Otherwise select the earliest phase in order with:
    - `status: done`
    - `review_status` missing, or `review_status: not reviewed`
 
@@ -115,10 +116,12 @@ Before doing substantive work:
 5. If execution state does not exist, stop and say review cannot proceed without execution state
 6. Read `.ai/plans/<slug>/session_log.md` if it exists
 7. Ensure the repo is a git repository and commits are possible
-8. Run `git status --short`
-
-If the worktree contains unrelated dirty changes outside the intended review-fix scope, stop and ask the user before committing anything.
-Do not accidentally sweep unrelated changes into a review-fix commit.
+8. Run `git status --short` and check for dirty worktree:
+   - If there are **no** uncommitted changes: proceed.
+   - If there are uncommitted changes **only within the phase's touched files**: proceed, but note in chat that uncommitted changes exist in the review scope — Codex will review the working tree state, not the last commit.
+   - If there are uncommitted changes **outside the phase scope**: stop and ask the user to commit or stash them first. Codex reviewing against a dirty worktree with out-of-scope changes produces unreliable findings. Do not proceed until the worktree is clean or the user explicitly approves.
+   
+   Do not accidentally sweep unrelated changes into a review-fix commit.
 
 ## Review metadata bootstrap
 
@@ -136,7 +139,7 @@ If the fields already exist, preserve them and update only the target phase unle
 ## Phase selection rules
 
 - Review only one phase per invocation
-- A new review may only start on a phase with `status: done`
+- A new review may only start on a phase with `status: done`. If the selected phase has any other status (`not started`, `in progress`, `blocked`, `cancelled`), refuse to review it and say why. This prevents reviewing incomplete work.
 - Never skip an earlier eligible done phase unless the user explicitly says so
 - If no done phase is eligible, say so clearly and stop
 - If a review is already in progress for a phase, resume it instead of selecting a new one
@@ -238,6 +241,15 @@ EOF
 ## Workflow
 
 Follow this loop exactly once for the selected phase.
+
+### Step 0 — Archive stale review artifact
+
+Before starting the review loop, check whether `.ai/plans/<slug>/review.md` already exists.
+
+If it does, check whether it belongs to the current target phase (compare `## 1. Review Target` phase number).
+- If it belongs to a **different phase**: archive it to `.ai/archive/` using the standard naming convention (`YYYYMMDD-<slug>-phase-NN-review.md`) before proceeding. This prevents the current review from reading stale findings from a previous phase.
+- If it belongs to the **current phase** and `review_status` is `in review`, `claude-fixed`, or `codex-fixed`: this is a resumed review — keep it and continue from the recorded state.
+- If it belongs to the **current phase** but `review_status` is `not reviewed` or missing: this is a leftover from an interrupted run — delete it and start fresh.
 
 ### Step 1 — Codex initial review
 

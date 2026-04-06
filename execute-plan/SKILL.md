@@ -127,11 +127,12 @@ Before doing substantive work:
 1. Resolve the plan slug (see above)
 2. Check whether `.ai/plans/<slug>/final_plan.md` exists
 3. If it does not exist, say so clearly and stop
-4. Read `.ai/plans/<slug>/final_plan.md`
-5. Ensure the plan directory exists
-6. Read `.ai/plans/<slug>/execution_state.md` if it exists
-7. Read `.ai/plans/<slug>/session_log.md` if it exists
-8. Inspect the relevant code, docs, and current implementation state before acting
+4. Read `.ai/plans.md` and verify the plan's status is `active`. If the plan is in `brainstorming` status, stop and tell the user to synthesize it first. If `completed` or `abandoned`, stop and say so.
+5. Read `.ai/plans/<slug>/final_plan.md`
+6. Ensure the plan directory exists
+7. Read `.ai/plans/<slug>/execution_state.md` if it exists
+8. Read `.ai/plans/<slug>/session_log.md` if it exists
+9. Inspect the relevant code, docs, and current implementation state before acting
 
 Do not execute directly from `.ai/plans/<slug>/evolution_plan.md`. If an evolution proposal exists but `final_plan.md` has not been written, stop and tell the user to synthesize or explicitly promote the evolution plan first.
 
@@ -152,8 +153,6 @@ Allowed phase statuses:
 - blocked
 - done
 - cancelled
-
-If `.ai/plans/<slug>/execution_state.md` does not exist, create it by extracting the roadmap phases from `.ai/plans/<slug>/final_plan.md`.
 
 If `final_plan.md` has no clear phase roadmap, derive one carefully from the plan and record that derivation in `execution_state.md`.
 
@@ -192,23 +191,29 @@ On each invocation, do the following in order:
 - Determine the current active phase
 - Determine what is already complete, in progress, blocked, or untouched
 
-2. Validate the next phase
+2. Initialize execution state if missing (**mandatory before any implementation work**)
+- If `execution_state.md` does not exist, create it now by extracting the roadmap phases from `final_plan.md`
+- Include review metadata defaults for every phase: `review_status: not reviewed`, `reviewed_on: not yet reviewed`, `review_commit_claude: none`, `review_commit_codex: none`, `review_notes: none`
+- **Write `execution_state.md` to disk and commit it immediately** — before touching any implementation files. Use a standalone commit: `Initialize execution state for <slug>`. This is the orphan-prevention rule: if a session crashes mid-implementation, the committed state file ensures the plan is recoverable and review is tracked.
+- Do not defer this commit to step 6. Do not bundle it with the first implementation commit. The state file must be on disk and in git before any code changes begin.
+
+3. Validate the next phase
 - Identify the earliest non-done phase
 - Restate its objective, scope, definition of done, dependencies, and risk
 - Check whether prerequisites are actually satisfied in the codebase and docs
 
-3. Work the phase
+4. Work the phase (only after execution_state.md exists)
 - Prefer finishing the current phase before opening new fronts
 - Make concrete progress against the phase definition of done
 - Keep changes scoped to the phase unless tightly necessary
 - Avoid opportunistic unrelated cleanup unless it materially helps the phase
 
-4. Verify completion honestly
+5. Verify completion honestly
 - Do not mark a phase done unless its definition of done is actually met
 - If partial progress was made, keep it in progress
 - If blocked, mark it blocked and explain exactly why
 
-5. Commit checkpoint when appropriate
+6. Commit checkpoint when appropriate
 - Prefer creating a git commit when the session ends in a coherent, revertable state with substantive implementation progress
 - Always commit when a phase is completed and verified
 - Prefer committing before or after a risky refactor, migration step, or other change that would be painful to unwind manually
@@ -217,12 +222,12 @@ On each invocation, do the following in order:
 - Stage only the intended implementation files plus relevant `.ai/` state files when appropriate
 - Use clear non-interactive commit messages tied to the phase, for example: `Execute plan <slug> phase 2: add prompt composer validation`
 
-6. Update durable records
+7. Update durable records
 - Update `.ai/plans/<slug>/execution_state.md`
 - Append a concise entry to `.ai/plans/<slug>/session_log.md`
 - Keep both files truthful and current
 
-7. Report clearly in chat
+8. Report clearly in chat
 - say which phase you worked on
 - what changed
 - whether the phase is now done, still in progress, or blocked
@@ -281,6 +286,7 @@ Verification field rules:
 - Prefer `test_commands` for multiple commands
 - If `test_commands` exists, preserve command order
 - Do not delete an existing `test_command` or `test_commands` entry unless you are replacing it with a more accurate equivalent
+- Commands must be runnable from the project root without assuming any particular shell state. Use relative paths from root (e.g., `cd apps/web && npm test`), not absolute paths. Include virtualenv activation or directory changes inline if needed.
 
 If review metadata fields are already present for a phase, preserve them when updating or regenerating `execution_state.md`.
 Review metadata fields may include:
@@ -320,16 +326,22 @@ Use this structure for each new entry:
 ```md
 ## Session YYYY-MM-DD HH:MM
 - plan: <slug>
+- mode: manual
 - active phase:
 - objective:
 - actions taken:
+- autonomous decisions: none
 - files touched:
 - verification performed:
 - commits:
+- codex availability: n/a
 - status after session:
 - blockers:
+- hard stop reason: none
 - next starting point:
 ```
+
+This is the same superset format used by autopilot. Both skills write the same format so `session_log.md` remains uniform regardless of whether a plan switches between manual and autopilot execution.
 
 ## Working rules during implementation
 

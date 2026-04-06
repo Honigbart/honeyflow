@@ -96,14 +96,15 @@ When you face a decision, resolve it using this priority order:
 
 Before starting the loop:
 1. Resolve the plan slug
-2. Read `.ai/plans/<slug>/final_plan.md`
-3. Read `.ai/plans/<slug>/execution_state.md` if it exists; create it if it doesn't (extract phases from `final_plan.md`)
-4. Read `.ai/plans/<slug>/session_log.md` if it exists
-5. Read Claude memory for relevant project and user context
-6. Read repo documentation (`AGENTS.md`, `README.md`, `CLAUDE.md`, etc.) for conventions
-7. Inspect relevant codebase context
-8. Run `git status --short` — if unrelated dirty changes exist, commit or stash them before starting to keep the worktree clean throughout the run
-9. Brief the user: state how many phases remain, which phase you will start with, and that you will report back when done or if truly stuck. Keep this to 2-3 sentences.
+2. Verify the plan's status is `active` in `.ai/plans.md`. If it is `brainstorming`, stop and tell the user to synthesize first. If `completed` or `abandoned`, stop and say so.
+3. Read `.ai/plans/<slug>/final_plan.md`
+4. Read `.ai/plans/<slug>/execution_state.md` if it exists. If it doesn't exist, create it now (extract phases from `final_plan.md`, include review metadata defaults: `review_status: not reviewed`, `reviewed_on: not yet reviewed`, `review_commit_claude: none`, `review_commit_codex: none`, `review_notes: none`) and **commit it immediately** with message `Initialize execution state for <slug>` — before touching any implementation files. This is the orphan-prevention rule: the committed state file ensures the plan is recoverable if the session crashes mid-implementation.
+5. Read `.ai/plans/<slug>/session_log.md` if it exists
+6. Read Claude memory for relevant project and user context
+7. Read repo documentation (`AGENTS.md`, `README.md`, `CLAUDE.md`, etc.) for conventions
+8. Inspect relevant codebase context
+9. Run `git status --short` — if unrelated dirty changes exist, commit or stash them before starting to keep the worktree clean throughout the run
+10. Brief the user: state how many phases remain, which phase you will start with, and that you will report back when done or if truly stuck. Keep this to 2-3 sentences.
 
 Do not execute directly from `evolution_plan.md`. If an evolution proposal exists but `final_plan.md` has not been written, stop and tell the user to synthesize first.
 
@@ -162,8 +163,16 @@ If Claude and Codex disagree on a finding:
 - Read the plan's accepted critiques, rejected critiques, and architecture sections
 - Read Claude memory for relevant user preferences
 - Side with whichever position **aligns better with the plan's stated intent**
-- If the plan does not clearly favor either position, side with the more conservative option (the one less likely to introduce a regression)
-- Document the disagreement and your resolution in `review_notes` and `session_log.md`
+- If the plan does not clearly favor either position, apply this tie-breaker hierarchy:
+  1. **Correctness over performance** — if one position prevents a bug or data loss, choose it even if the other is faster or cleaner
+  2. **Existing behavior over new behavior** — prefer the option that preserves current working behavior, unless the plan explicitly requires changing it
+  3. **Smaller diff over larger diff** — when both options are equally valid, the one that changes less code is safer to ship without user review
+- Document **each individual disagreement** in `review_notes` in `execution_state.md` **and** in `session_log.md` with:
+  - what the disagreement was about (the specific finding)
+  - Claude's position
+  - Codex's position
+  - which side was chosen and why (referencing plan section, memory, or reasoning)
+- The `review_notes` field in `execution_state.md` must indicate that a disagreement was resolved autonomously, so users auditing the phase tracker can see it without reading the session log. Use format: `disagreement resolved autonomously: <one-line summary of finding and resolution>`
 - Mark the phase `reviewed` (not `in disagreement`) and continue
 
 Never leave a phase `in disagreement` during autopilot. Always resolve it and move on.
@@ -197,7 +206,9 @@ If you discover during execution that the plan is materially wrong about somethi
 
 Default is strict sequential ordering. Only violate if:
 - A small prerequisite from a later phase is needed to unblock the current phase — pull it forward, document why
-- The plan itself contains an ordering mistake (e.g., phase 3 depends on phase 5's output) — reorder logically, document why
+- The plan itself is clearly wrong about ordering (e.g., phase 3 depends on phase 5's output) — reorder logically, document why
+
+Use the same threshold as `execute-plan`: the ordering must be **clearly wrong**, not merely suboptimal.
 
 ## Hard stops
 
@@ -212,9 +223,11 @@ Autopilot stops **only** in these situations. These are cases where continuing w
 4. **Context limit approaching.** If you are running low on context and still have phases to complete, stop at the current phase boundary, commit all work, update all state files, and tell the user to re-invoke `/autopilot` to continue. The durable state in `execution_state.md` and `session_log.md` ensures you can pick up exactly where you left off.
 
 When you hit a hard stop:
-- Commit all current work
-- Update `execution_state.md` and `session_log.md` with the full situation
-- Report to the user clearly: what phase, what happened, what is needed to continue
+1. Update `execution_state.md` and `session_log.md` with the full situation **first**
+2. Stage and commit state files together with any uncommitted implementation work in a single coherent commit. If implementation work is in a broken state, commit only the state files so the plan is recoverable. Use message: `Autopilot hard stop for <slug> at phase N: <reason>`
+3. Report to the user clearly: what phase, what happened, what is needed to continue
+
+The order matters: state files must be updated before the commit so they are included. Never commit code changes without also committing the current state files — this is how orphan plans happen.
 
 **Everything else is your call.** If you are uncertain but the plan gives you enough to make a reasonable decision, make it and document it. That is what autopilot means.
 
@@ -272,6 +285,8 @@ Use the same structures as `execute-plan` and `execute-review`:
 ```
 
 This format is a superset of the `execute-plan` session log format, adding `mode`, `autonomous decisions`, `codex availability`, and `hard stop reason`. Both formats can coexist in the same `session_log.md` if a plan switches between manual and autopilot execution.
+
+**Normalization rule:** When reading a `session_log.md` that contains entries from both formats, treat the `execute-plan` format as equivalent to an autopilot entry with `mode: manual`, `autonomous decisions: none`, `codex availability: n/a`, and `hard stop reason: none`. When writing entries, always use the autopilot superset format regardless of which skill is active — this ensures the log is uniform going forward without rewriting existing entries.
 
 ## Review rules
 

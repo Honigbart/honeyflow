@@ -298,9 +298,9 @@ When brainstorming for an existing project:
 
 ## Stale artifact cleanup
 
-After writing `.ai/plans/<slug>/claude_brainstorm.md`, check whether `.ai/plans/<slug>/codex_critique.md` exists. If it does, **delete it** — it critiques a previous brainstorm and is now stale. The user must re-run `brainstorm-critique` to generate a fresh critique for the new brainstorm.
+After writing `.ai/plans/<slug>/claude_brainstorm.md`, check whether `.ai/plans/<slug>/codex_critique.md` exists. If it does, **archive it** to `.ai/archive/` with a date-prefixed filename such as `YYYYMMDD-<slug>-stale-codex-critique.md` before deleting the original — it critiques a previous brainstorm and is now stale, but preserving it in the archive allows the user to reference prior critique if they want to compare iterations. The user must re-run `brainstorm-critique` to generate a fresh critique for the new brainstorm.
 
-Also check whether `.ai/plans/<slug>/evolution_plan.md` exists. If it does, treat it as stale for this new brainstorm cycle. Prefer **moving** it to `.ai/archive/` with a date-prefixed filename such as `YYYYMMDD-<slug>-stale-evolution-plan.md`. If archiving is not practical, say so clearly and delete it only as a fallback.
+Also check whether `.ai/plans/<slug>/evolution_plan.md` exists. If it does, check its `## 0. Source Plan` section to determine whether it belongs to the current slug's planning cycle or was left over from a different cycle. Either way, treat it as stale for this new brainstorm. Prefer **moving** it to `.ai/archive/` with a date-prefixed filename such as `YYYYMMDD-<slug>-stale-evolution-plan.md`. If archiving is not practical, say so clearly and delete it only as a fallback.
 
 Do not delete or rewrite `final_plan.md`, `execution_state.md`, or `session_log.md` here. If those files exist for this slug, stop and surface the inconsistency instead of trying to clean it up automatically.
 
@@ -313,7 +313,7 @@ Before finishing:
 2. Ensure it contains all required sections
 3. Ensure the "Codex Critique Handoff" section is present
 4. If this is an existing project, ensure "Current State / Existing Context", "System Fit", and "Migration / Refactor Considerations" are substantive
-5. Delete `.ai/plans/<slug>/codex_critique.md` if it exists (stale from prior brainstorm)
+5. Archive `.ai/plans/<slug>/codex_critique.md` to `.ai/archive/` if it exists (stale from prior brainstorm)
 6. Move stale `.ai/plans/<slug>/evolution_plan.md` to `.ai/archive/` if it exists
 7. Ensure `.ai/plans.md` has an entry for this slug with status `brainstorming`
 8. Then provide a short in-chat summary of the recommended direction and biggest risk
