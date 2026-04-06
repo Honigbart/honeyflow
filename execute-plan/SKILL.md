@@ -44,6 +44,8 @@ Two paths feed into execution:
 1. quick-plan → (optional: quick-critique) → 2. execute-plan → 3. evolve
 ```
 
+**Autopilot:** `/autopilot` can replace the manual `/execute-plan` + `/execute-review` loop for fully autonomous execution.
+
 All pipeline skills operate on **namespaced plans**. Each plan has a unique slug and its own directory.
 
 **Directory layout**
@@ -70,6 +72,7 @@ All pipeline skills operate on **namespaced plans**. Each plan has a unique slug
 - `execute-plan` creates or resets `execution_state.md` for the plan.
 - `execute-review` finishing the last required phase review → copies plan dir to `.ai/archive/<slug>/`, deletes `.ai/plans/<slug>/`, sets status to `completed`.
 - `evolve` creates a NEW plan slug + directory referencing a previous plan. Writes `evolution_plan.md` in the new directory.
+- `autopilot` drives execution and review of all phases autonomously. Uses the same artifacts and rules as `execute-plan` and `execute-review`.
 
 **This skill's state responsibility:** Drive implementation phases of the active plan to completion. Maintain `.ai/plans/<slug>/execution_state.md` and `.ai/plans/<slug>/session_log.md`. Do not archive the plan merely because implementation is complete; leave plan archival to the point where implementation and required reviews are both complete, unless the user explicitly directs otherwise.
 

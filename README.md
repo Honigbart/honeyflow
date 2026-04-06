@@ -15,6 +15,7 @@ The goal is simple: think before you build, get a second opinion, execute with d
 | `/quick-critique` | Sends a quick plan to Codex CLI for review. |
 | `/execute-plan` | Phase-by-phase implementation with durable state tracking across sessions. |
 | `/execute-review` | Post-implementation review per phase through a Claude/Codex loop. |
+| `/autopilot` | Fully autonomous execution + review of all phases. No user input needed. |
 | `/evolve` | Takes a completed plan and proposes a grounded v2 direction. |
 | `/todo` | Lightweight project todo list with priority buckets. Feeds context into planning. |
 | `/plan-migrate` | Migrates plan layouts when the skill format changes. |
@@ -36,7 +37,7 @@ mkdir -p ~/.claude/skills
 
 for skill in brainstorm brainstorm-critique brainstorm-synthesize \
              quick-plan quick-critique execute-plan execute-review \
-             evolve todo plan-migrate; do
+             autopilot evolve todo plan-migrate; do
   ln -s ~/honeyflow/$skill ~/.claude/skills/$skill
 done
 ```
@@ -46,7 +47,7 @@ done
 ```powershell
 $skills = @("brainstorm","brainstorm-critique","brainstorm-synthesize",
             "quick-plan","quick-critique","execute-plan","execute-review",
-            "evolve","todo","plan-migrate")
+            "autopilot","evolve","todo","plan-migrate")
 
 foreach ($skill in $skills) {
   New-Item -ItemType SymbolicLink `
@@ -92,7 +93,12 @@ There are two paths into the pipeline:
 /quick-plan → (optional: /quick-critique) → /execute-plan → /execute-review
 ```
 
-Both paths produce the same `final_plan.md` structure, so execution and review work identically regardless of how the plan was created. After a plan is fully implemented and reviewed, `/evolve` can kick off the next version.
+**Autopilot** for hands-off execution (works with either path):
+```
+/quick-plan or /brainstorm-synthesize → /autopilot
+```
+
+All paths produce the same `final_plan.md` structure, so execution and review work identically regardless of how the plan was created. `/autopilot` replaces the manual `/execute-plan` + `/execute-review` loop when you want fully autonomous execution. After a plan is fully implemented and reviewed, `/evolve` can kick off the next version.
 
 ### The todo list
 
@@ -195,9 +201,36 @@ You:    /execute-plan
         ... (same execution + review cycle as above)
 ```
 
+### Autopilot flow
+
+```
+You:    /quick-plan add-rate-limiting
+        Add rate limiting middleware to the API routes, 100 req/min per API key
+
+Claude: [writes final_plan.md with 2 phases]
+
+You:    /autopilot
+
+Claude: "Starting autopilot for add-rate-limiting: 2 phases remaining, beginning at phase 1."
+
+        [implements phase 1, commits]
+        [runs Codex review on phase 1, clean, archives review]
+        [implements phase 2, commits]
+        [runs Codex review on phase 2, finds issue, Claude fixes, Codex re-reviews, clean]
+        [archives plan to .ai/archive/add-rate-limiting/]
+
+        "Autopilot complete for add-rate-limiting.
+         Phases: 2 executed, 2 reviewed
+         Commits: abc1234, def5678, ghi9012
+         Autonomous decisions: 1 (see session_log.md)
+         Plan status: completed"
+```
+
+Autopilot makes all decisions on its own. If Codex is unavailable, it falls back to Claude review automatically. If Claude and Codex disagree on a finding, it resolves the disagreement based on what the plan says and moves on. It only stops for things it truly cannot resolve (missing credentials, fundamentally broken plan, or running out of context).
+
 ## Notes
 
-**Codex CLI required for critiques and reviews.** The `/brainstorm-critique`, `/quick-critique`, and `/execute-review` skills invoke [Codex CLI](https://github.com/openai/codex) through the shell. If Codex is unavailable (rate limit, auth failure, quota), the skill will tell you the reason and ask if Claude should produce a temporary fallback critique instead. If you say yes, the fallback gets a provenance note so you know it wasn't Codex. A future invocation will prefer Codex again and can overwrite the fallback.
+**Codex CLI required for critiques and reviews.** The `/brainstorm-critique`, `/quick-critique`, and `/execute-review` skills invoke [Codex CLI](https://github.com/openai/codex) through the shell. If Codex is unavailable (rate limit, auth failure, quota), the skill will tell you the reason and ask if Claude should produce a temporary fallback critique instead. If you say yes, the fallback gets a provenance note so you know it wasn't Codex. A future invocation will prefer Codex again and can overwrite the fallback. In `/autopilot` mode, Claude falls back automatically without asking since the whole point is hands-off execution.
 
 **Plans are durable across sessions.** The `execution_state.md` and `session_log.md` files track exactly where you left off. You can close your terminal, come back tomorrow, run `/execute-plan`, and it picks up from the right phase.
 

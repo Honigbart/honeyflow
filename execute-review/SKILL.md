@@ -41,6 +41,8 @@ Two paths feed into this pipeline:
 1. quick-plan → (optional: quick-critique) → 2. execute-plan → 3. evolve
 ```
 
+**Autopilot:** `/autopilot` can replace the manual `/execute-plan` + `/execute-review` loop for fully autonomous execution.
+
 All pipeline skills operate on **namespaced plans**. Each plan has a unique slug and its own directory.
 
 **Canonical files for this skill**
