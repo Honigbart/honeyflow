@@ -238,6 +238,24 @@ EOF
 
 **Timing note:** The `--output-last-message` flag writes `review.md` only when the Codex process exits, not during execution. Always wait for the command to complete before reading the output file. Do not run the Codex command in the background — run it synchronously so the file is guaranteed to exist when the next step begins.
 
+## Codex fallback rule
+
+Codex has priority for this skill. Always attempt Codex first. Never assume an earlier failure is still in effect.
+
+If Codex CLI is unavailable or the shell command fails:
+- **Use a subagent for review instead of reviewing your own work directly.** Self-review has an inherent blind-spot problem — you are checking code you just orchestrated and will unconsciously anchor to your own reasoning. A subagent starts with a fresh context window and approaches the code as an independent reader.
+- Spawn an Agent with `subagent_type: "general-purpose"` and a review prompt that includes:
+  - The phase number, name, objective, and definition of done
+  - The list of files in scope (one per line)
+  - Plan context: relevant accepted/rejected critiques and architecture decisions from `final_plan.md`
+  - Test command(s) if recorded
+  - Clear instruction: "You are a skeptical code reviewer. You have not seen this code before. Read the listed files, compare against the definition of done, and find bugs, missing edge cases, unmet requirements, or regressions. Run the test command(s) if provided. Write your findings as markdown to `.ai/plans/<slug>/review.md` using the standard review structure (sections 1-7). Be concrete and direct. Do not flag style preferences — focus on behavioral correctness."
+  - **Do not include** your implementation reasoning, session context, or why you made specific choices
+- Prepend a provenance note to `review.md` stating this review was produced by a Claude subagent (not Codex) because Codex was unavailable, including the failure reason
+- Note briefly in chat that Codex was unavailable and a Claude subagent produced the review instead — one line, not a conversation
+- Continue the fix loop normally using the subagent's findings
+- If a future invocation can reach Codex again, prefer Codex
+
 ## Workflow
 
 Follow this loop exactly once for the selected phase.
