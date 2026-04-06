@@ -16,8 +16,8 @@ The goal is simple: think before you build, get a second opinion, execute with d
 | `/execute-plan` | Phase-by-phase implementation with durable state tracking across sessions. |
 | `/execute-review` | Post-implementation review per phase through a Claude/Codex loop. |
 | `/evolve` | Takes a completed plan and proposes a grounded v2 direction. |
-| `/todo` | Lightweight project todo list that integrates with the planning pipeline. |
-| `/plan-migrate` | Migrates legacy single-plan layouts to the namespaced format. |
+| `/todo` | Lightweight project todo list with priority buckets. Feeds context into planning. |
+| `/plan-migrate` | Migrates plan layouts when the skill format changes. |
 
 ## Install
 
@@ -27,7 +27,9 @@ Clone the repo somewhere on your machine:
 git clone git@github.com:Honigbart/honeyflow.git ~/honeyflow
 ```
 
-Then symlink each skill into your Claude Code skills directory:
+Then symlink each skill into your Claude Code skills directory.
+
+**Linux / macOS / WSL:**
 
 ```bash
 mkdir -p ~/.claude/skills
@@ -39,7 +41,21 @@ for skill in brainstorm brainstorm-critique brainstorm-synthesize \
 done
 ```
 
-That's it. The skills will be available in your next Claude Code session.
+**Windows (PowerShell, run as Administrator):**
+
+```powershell
+$skills = @("brainstorm","brainstorm-critique","brainstorm-synthesize",
+            "quick-plan","quick-critique","execute-plan","execute-review",
+            "evolve","todo","plan-migrate")
+
+foreach ($skill in $skills) {
+  New-Item -ItemType SymbolicLink `
+    -Path "$env:USERPROFILE\.claude\skills\$skill" `
+    -Target "$env:USERPROFILE\honeyflow\$skill"
+}
+```
+
+The skills will be available in your next Claude Code session.
 
 ## How it works
 
@@ -58,6 +74,24 @@ There are two paths into the pipeline:
 ```
 
 Both paths produce the same `final_plan.md` structure, so execution and review work identically regardless of how the plan was created. After a plan is fully implemented and reviewed, `/evolve` can kick off the next version.
+
+### The todo list
+
+`/todo` maintains a lightweight task list at `.ai/todo.md` with three priority buckets: **Now**, **Next**, and **Later**. It's not just a standalone list though. When you run `/brainstorm` or `/quick-plan`, the skill reads your Now and Next items and uses them as context. If a plan addresses specific todo items, it tracks that reference all the way through: brainstorm notes it, synthesize carries it into the final plan, and when `/execute-review` archives a fully completed plan, the referenced todo items get auto-marked as done.
+
+```
+You:    /todo
+        Add "fix rate limiting" to Now and "add webhook support" to Next
+
+Claude: [updates .ai/todo.md]
+
+You:    /quick-plan fix-rate-limiting
+Claude: [reads todo, sees the Now item, references it in the plan]
+
+        ... (execute + review cycle)
+
+Claude: [archives plan, auto-marks "fix rate limiting" as done in todo.md]
+```
 
 ## Examples
 
@@ -103,8 +137,17 @@ You:    /quick-plan add-rate-limiting
 Claude: [inspects codebase, writes final_plan.md with 2 phases]
         "2 phases: middleware + tests. Run /quick-critique or /execute-plan next."
 
-You:    /execute-plan
+You:    /quick-critique
 
+Claude: [runs Codex CLI, writes codex_critique.md]
+        "Codex says: consider Redis backend for multi-instance, but minor nit for now."
+
+You:    /quick-plan add-rate-limiting
+        (re-running incorporates the critique findings into an updated plan)
+
+Claude: [reads codex_critique.md, updates final_plan.md]
+
+You:    /execute-plan
 Claude: [implements phase 1, commits]
 
 You:    /execute-plan
@@ -113,6 +156,8 @@ Claude: [implements phase 2, commits, all phases done, awaiting review]
 You:    /execute-review
 Claude: [Codex reviews, clean, archives plan]
 ```
+
+The `/quick-critique` step is optional. If the task is straightforward, go straight from `/quick-plan` to `/execute-plan`.
 
 ### Evolve flow
 
@@ -139,7 +184,9 @@ You:    /execute-plan
 
 **Review gates completion.** A plan isn't archived just because implementation is done. Every completed phase must also pass the `/execute-review` Codex loop. If Claude and Codex disagree on a finding, the phase is marked `in disagreement` and you decide how to proceed.
 
-**Todo integration.** If you maintain `.ai/todo.md` via `/todo`, brainstorm and quick-plan will pick up your Now/Next items as context. When a plan that references todo items is fully completed and reviewed, those items get auto-marked as done.
+**Archive location.** Completed plans currently archive to `.ai/archive/<slug>/`. A future version may move this to `.ai/plans/archive/<slug>/` to keep everything under one roof. When that happens, `/plan-migrate` will handle the transition.
+
+**Updating the skills.** When the skill format changes (new artifact structure, renamed fields, directory layout changes), `/plan-migrate` acts as the migration engine. It detects outdated layouts in your project and upgrades them to the current format, similar to how database migrations work. Pull the latest skills, and if your `.ai/` layout needs updating, `/plan-migrate` will tell you.
 
 ## License
 
