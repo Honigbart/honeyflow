@@ -93,15 +93,20 @@ If `.ai/todo.md` does not exist and the user asks "what's next", tell them there
 
 When the user describes multiple changes at once, apply them all in a single file write and confirm with a summary.
 
-## Integration with the brainstorm pipeline
+## Integration with the planning pipeline
 
-The todo list participates in the brainstorm → synthesize → execute → review pipeline (all plans are namespaced under `.ai/plans/<slug>/`):
+The todo list participates in the planning → execute → review pipeline (all plans are namespaced under `.ai/plans/<slug>/`):
 
+**Full path:**
 1. **brainstorm** reads `.ai/todo.md` and uses **Now**/**Next** items as context. If the brainstorm addresses specific items, it lists them in a `## 17. Todo Context` section in `.ai/plans/<slug>/claude_brainstorm.md`.
 2. **brainstorm-synthesize** carries those references into `.ai/plans/<slug>/final_plan.md` as `## 15. Todo References`.
-3. **execute-review**, when it archives a fully completed and reviewed plan, reads `## 15. Todo References` from the plan's `final_plan.md` and marks those items as done in `.ai/todo.md`.
+3. **execute-review** (or **autopilot**), when it archives a fully completed and reviewed plan, reads `## 15. Todo References` from the plan's `final_plan.md` and marks those items as done in `.ai/todo.md`.
 
-This means: if a todo item triggers a brainstorm and makes it all the way through execution and review, it gets auto-completed at the end. No manual cleanup needed.
+**Quick path:**
+1. **quick-plan** reads `.ai/todo.md` and uses **Now**/**Next** items as context. If the plan addresses specific items, it lists them directly in `## 15. Todo References` in `.ai/plans/<slug>/final_plan.md`.
+2. **execute-review** (or **autopilot**) marks those items as done when archiving, same as the full path.
+
+Both paths end the same way: if a todo item is referenced in a plan's `## 15. Todo References` and the plan makes it through execution and review, the item gets auto-completed. No manual cleanup needed.
 
 ## Integration with execute-plan
 

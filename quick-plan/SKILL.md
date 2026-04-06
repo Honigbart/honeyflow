@@ -109,7 +109,7 @@ The plan should be:
 Before starting:
 1. Resolve the plan slug (see above)
 2. Check for legacy layout
-3. Read `.ai/todo.md` if it exists — use **Now** and **Next** items as context
+3. Read `.ai/todo.md` if it exists — use **Now** and **Next** items as context. If this plan addresses specific todo items, note which ones so they can be referenced in `## 15. Todo References` of the final plan
 4. If re-planning an existing slug, read the existing `codex_critique.md` if present and incorporate relevant findings
 5. Briefly inspect the relevant codebase context if this concerns an existing project
 6. Understand the task well enough to produce a plan — if not, ask 1-2 clarifying questions, then proceed
@@ -198,7 +198,9 @@ Give a concrete ordered task list. For a 2-phase task, 5-7 tasks may be enough �
 List useful next documents if any. For small tasks, this may be "None needed."
 
 ## 15. Todo References
-If `.ai/todo.md` was read and this plan addresses specific todo items, list them here exactly as they appear in the todo file.
+If `.ai/todo.md` was read and this plan addresses specific todo items, list them here **exactly as they appear in the todo file** (verbatim text, including the `- [ ]` prefix).
+These references are used by `execute-review` and `autopilot` to auto-mark todo items as done when the plan is archived.
+Do not force a connection — only reference items this plan genuinely addresses.
 If no todo items are referenced, omit this section.
 
 ## 16. Implementation Handoff
