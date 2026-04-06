@@ -19,9 +19,8 @@ Use this skill when:
 - phases should be completed in order from first to last unless the user explicitly changes priorities
 
 This skill is especially appropriate after a prior workflow such as:
-- `brainstorm`
-- `brainstorm-critique`
-- `brainstorm-synthesize`
+- `brainstorm` → `brainstorm-critique` → `brainstorm-synthesize`
+- `quick-plan` (with or without a `/quick-critique` pass)
 - `evolve`, but only after the confirmed evolution direction has been written or promoted into `final_plan.md`
 
 Do not use this skill for:
@@ -33,10 +32,16 @@ Do not use this skill for:
 
 ## Pipeline Context
 
-This skill is **step 4 of 5** in a planning pipeline:
+Two paths feed into execution:
 
+**Full path:**
 ```
 1. brainstorm → 2. brainstorm-critique → 3. brainstorm-synthesize → 4. execute-plan → 5. evolve
+```
+
+**Quick path:**
+```
+1. quick-plan → (optional: quick-critique) → 2. execute-plan → 3. evolve
 ```
 
 All pipeline skills operate on **namespaced plans**. Each plan has a unique slug and its own directory.
@@ -60,7 +65,8 @@ All pipeline skills operate on **namespaced plans**. Each plan has a unique slug
 
 **Key transition rules**
 - `brainstorm` creates a new plan slug and directory. Writes `claude_brainstorm.md` inside it. Sets status to `brainstorming` in `plans.md`.
-- `brainstorm-synthesize` is the only skill that writes `final_plan.md` inside a plan directory. Transitions status to `active`.
+- `brainstorm-synthesize` writes `final_plan.md` inside a plan directory. Transitions status from `brainstorming` to `active`.
+- `quick-plan` creates a new plan slug and directory. Writes `final_plan.md` directly. Sets status to `active` in `plans.md`.
 - `execute-plan` creates or resets `execution_state.md` for the plan.
 - `execute-review` finishing the last required phase review → copies plan dir to `.ai/archive/<slug>/`, deletes `.ai/plans/<slug>/`, sets status to `completed`.
 - `evolve` creates a NEW plan slug + directory referencing a previous plan. Writes `evolution_plan.md` in the new directory.

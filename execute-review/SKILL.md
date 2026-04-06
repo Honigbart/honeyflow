@@ -29,10 +29,16 @@ Do not use this skill for:
 
 ## Pipeline Context
 
-This skill is part of a planning pipeline:
+Two paths feed into this pipeline:
 
+**Full path:**
 ```
 1. brainstorm → 2. brainstorm-critique → 3. brainstorm-synthesize → 4. execute-plan → 5. evolve
+```
+
+**Quick path:**
+```
+1. quick-plan → (optional: quick-critique) → 2. execute-plan → 3. evolve
 ```
 
 All pipeline skills operate on **namespaced plans**. Each plan has a unique slug and its own directory.
