@@ -230,7 +230,7 @@ Autopilot makes all decisions on its own. If Codex is unavailable, it falls back
 
 ## Notes
 
-**Codex CLI required for critiques and reviews.** The `/brainstorm-critique`, `/quick-critique`, and `/execute-review` skills invoke [Codex CLI](https://github.com/openai/codex) through the shell. If Codex is unavailable (rate limit, auth failure, quota), the skill will tell you the reason and ask if Claude should produce a temporary fallback critique instead. If you say yes, the fallback gets a provenance note so you know it wasn't Codex. A future invocation will prefer Codex again and can overwrite the fallback. In `/autopilot` mode, Claude falls back automatically without asking since the whole point is hands-off execution.
+**Codex CLI required for critiques and reviews.** The `/brainstorm-critique`, `/quick-critique`, and `/execute-review` skills invoke [Codex CLI](https://github.com/openai/codex) through the shell. If Codex is unavailable (rate limit, auth failure, quota), Claude automatically produces the critique or review itself without interrupting your flow. The fallback gets a provenance note so you know it wasn't Codex. A future invocation will prefer Codex again and can overwrite the fallback.
 
 **Plans are durable across sessions.** The `execution_state.md` and `session_log.md` files track exactly where you left off. You can close your terminal, come back tomorrow, run `/execute-plan`, and it picks up from the right phase.
 
