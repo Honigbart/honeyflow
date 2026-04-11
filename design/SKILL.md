@@ -2,13 +2,15 @@
 name: design
 description: Invoke when building any UI, component, page, or visual interface. Produces distinctive design with a committed aesthetic, not generic defaults. Not for backend logic or data pipelines.
 metadata:
-  version: "3.7.0"
+  version: "3.7.0+merge.1"
   source: "https://github.com/tw93/waza/tree/main/skills/design"
   upstream_author: "Tw93"
   upstream_license: "MIT (see LICENSE.upstream)"
+  merged_from: "https://github.com/Leonxlnx/taste-skill (concepts only, paraphrased)"
 ---
 
-> **Source**: Extracted from [tw93/waza](https://github.com/tw93/waza) (`skills/design`), MIT-licensed, © Tw93. See `LICENSE.upstream`.
+> **Source**: Core extracted from [tw93/waza](https://github.com/tw93/waza) (`skills/design`), MIT-licensed, © Tw93 — see `LICENSE.upstream`.
+> Additional rules on Content Realism, Responsive Hazards, Dependency Verification, Creative Arsenal, and the Bento Motion Paradigm paraphrased (no verbatim copy) from [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) and documented in `references/design-reference.md`.
 
 # Design: Build It With a Point of View
 
@@ -48,6 +50,8 @@ For production or multi-page UIs, expand the thesis into the 9-section DESIGN.md
 - **Accessibility baseline**: honor `prefers-reduced-motion`, visible focus states on all interactive elements, `alt` on all images.
 - **Complexity match**: maximalist visions need elaborate animation code; minimalist ones need precision in spacing and typography. Do not apply the same level of effort to both.
 - **CSS-pattern bans**: no `border-left`/`border-right` wider than 1px as a section accent; no `background-clip: text` gradient text; no glassmorphism as the default surface treatment; no purple-to-blue gradients or cyan-on-dark as accent system; no modal unless a non-modal alternative is genuinely worse. Full list with rewrites in `references/design-reference.md`.
+- **Content realism**: placeholder slop gives away AI output as fast as typography slop. No "John Doe" / "Jane Doe" / "Acme" / "Nexus" / "SmartFlow"; no round-number metrics like `99.99%` or `50%`; no AI-copywriting verbs like "Elevate", "Seamless", "Unleash", "Next-Gen"; no default user-icon avatars; no Unsplash hotlinks. See Content Realism in `references/design-reference.md`.
+- **Responsive hazards**: never `h-screen` for full-viewport sections — iOS Safari's URL bar collapse causes layout jumps. Use `min-h-[100dvh]`. Never build multi-column layouts with flex percentage math (`w-[calc(33%-1rem)]`); use CSS Grid. For any asymmetric layout above `md:`, explicitly collapse to a single column at `<768px`. See Responsive Hazards in `references/design-reference.md`.
 
 ## Gotchas
 
@@ -65,6 +69,9 @@ For production or multi-page UIs, expand the thesis into the 9-section DESIGN.md
 | Every project ended up with the same look | Vary light/dark, serif/sans, dense/spacious. If it could have been the last project, it is not designed for this one. |
 | Heavy `border: 1px solid` on every container, flat buttons, no depth | This is 2015 UI kit default. Replace with shadow-step depth, `active:scale-95` on buttons, translucent borders (`border/30`). |
 | Light-mode app: white panel on white background, visually indistinguishable | Adjacent nested surfaces must differ visually. Either background step (sidebar vs main ≥4% lightness difference) or shadow minimum `0 1px 3px rgba(0,0,0,0.10)`. |
+| "Three equal cards in a row" feature grid | Template cliché — swap for zig-zag two-column, asymmetric bento, or horizontal scroll. A three-column card row is almost never the right answer. |
+| Used `h-screen` for hero — jumps on mobile Safari URL-bar collapse | Use `min-h-[100dvh]`. Mobile viewport units (`svh`/`dvh`/`lvh`) account for collapsing browser chrome. |
+| Fake-looking placeholder content: "John Doe", "Acme", `99.99%` uptime | Content realism is part of the design. Invent plausible, slightly messy data: `47.2%`, real-shaped phone numbers, contextual brand names. |
 
 ## Handoff
 

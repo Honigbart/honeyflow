@@ -166,6 +166,165 @@ For a single component or quick prototype, skip this. The three-line thesis in S
 
 Would a stranger glancing at the first viewport say "an AI made this" immediately? If yes, the committed direction was not committed enough. The usual culprits: reflex font, default purple accent, centered hero with generic card grid beneath. Fix the typography, the color system, or the layout until the answer flips.
 
+## Content Realism
+
+Placeholder content gives away AI output as quickly as typography does. Treat sample data, copy, and imagery as part of the design, not filler.
+
+**Names and brands**
+
+| Reject | Why | Replace with |
+|---|---|---|
+| "John Doe", "Jane Doe", "Sarah Chan" | Default dataset — reads as stock | Invent plausible names with specificity: "Priya Venkatesan", "Hiro Okafor", "Maren Lindqvist" |
+| "Acme", "Nexus", "SmartFlow", "InnovateX" | Startup-slop naming | Contextual brand names tied to the product's domain (e.g. a lockbox rental SaaS → "Tumbler", not "SmartLock Pro") |
+| Generic job titles: "Product Manager" | Too neutral to feel real | Specific roles that imply a real org: "Staff Platform Engineer, Growth", "Regional Lead, APAC" |
+
+**Numbers**
+
+- Ban round or suspiciously perfect metrics: `99.99%`, `100%`, `50%`, `10,000+`.
+- Real metrics are messy: `47.2%`, `3,847 teams`, `+1 (312) 847-1928`, `$4.17M ARR`.
+- Pick numbers that would make sense on a real dashboard — not numbers that look nice centered in a marketing panel.
+- For dynamically updating numerals (counters, timers, prices), use `font-variant-numeric: tabular-nums` so columns don't jitter.
+
+**Copy**
+
+Ban AI-copywriter verbs that signal "LLM wrote this":
+
+> Elevate · Seamless · Unleash · Next-Gen · Empower · Harness · Revolutionize · Transform · Reimagine · Supercharge · Unlock
+
+Replace with concrete, specific verbs tied to what the product actually does. "Cuts deployment time by 40%" beats "Empower your team to ship faster."
+
+**Imagery**
+
+- Do not hotlink Unsplash — links break, images are overused. Use `https://picsum.photos/seed/{stable-seed}/{w}/{h}` for deterministic placeholders that survive reloads.
+- Avatars: never the default egg, Lucide user icon, or generic SVG silhouette. Use initials on a tinted neutral background tied to the project palette, or a small inline illustration system.
+- Icons: stick to one family at one weight. Mixing Heroicons, Lucide, and Font Awesome shows through as inconsistent line weight.
+- No emojis inside UI chrome (buttons, nav, labels). Emojis are acceptable in user-generated content but not in shipped interface text — use an icon family instead.
+
+## Responsive Hazards
+
+Mobile-first sounds obvious until you ship a layout that works on every breakpoint except the one iOS Safari actually renders. Specific traps to avoid:
+
+- **`h-screen` and the collapsing URL bar**: on iOS Safari and Chrome Mobile, the address bar expands and collapses on scroll, so `100vh` jumps by ~80px mid-page. For any full-viewport hero or fullscreen overlay, use `min-h-[100dvh]` (dynamic viewport height) or, for layouts that need the smallest-stable value, `100svh`. Reserve `100lvh` for intentional edge-to-edge immersive states. Do not use `h-screen` for hero sections.
+- **Flexbox percentage math**: expressions like `w-[calc(33.333%-1rem)]` are brittle — they drift under `box-sizing`, break when a sibling reflows, and are a pain to debug. Use CSS Grid (`grid grid-cols-1 md:grid-cols-3 gap-6`) for any multi-column structure. Reserve flex for one-dimensional alignment (a row of icons in a header, a button with an icon).
+- **Asymmetric layouts and the `<md` fallback**: any non-symmetric grid — masonry, 2-column split, overlap, diagonal flow — must collapse explicitly to a single column below `768px`. Do not rely on the grid "sort of working" on mobile; write the fallback. Pattern: `grid md:grid-cols-[2fr_1fr] gap-8 px-4 md:px-8` with per-item `order-*` overrides for mobile reading flow.
+- **Horizontal overflow from large headlines**: display type at 48–72px will blow past a `375px` viewport if you haven't tested it. Use `clamp(32px, 6vw, 72px)` for display sizes instead of fixed breakpoint sizes, or explicitly shrink the headline at `sm:`.
+- **Container width**: cap the main column with `max-w-[1400px] mx-auto` (or `max-w-7xl`) on large screens so 27" monitors don't stretch line length past the readable limit (~80ch).
+- **Touch hover-stickiness**: on touch devices, a tapped element can stick in the `:hover` state until the next tap elsewhere. Wrap hover styles with `@media (hover: hover)` so they only apply to pointer devices (Tailwind: `[@media(hover:hover)]:hover:*`).
+- **`dvh` browser support**: `dvh`/`svh`/`lvh` are well-supported on modern iOS and evergreen browsers, but test on the lowest-version Safari in your target. For a safe fallback, stack `min-height: 100vh; min-height: 100dvh;`.
+
+## Dependency and Stack Verification
+
+Before writing motion or component code that imports a third-party library, confirm the library is actually installed — the single most common AI-design failure in real projects is importing a framework that isn't in `package.json`, then shipping broken code.
+
+- **`package.json` first**: if the code uses `framer-motion`, `lucide-react`, `@phosphor-icons/react`, `zustand`, `@radix-ui/*`, `gsap`, `three`, or any motion/UI library, grep `package.json` before writing the import. If missing, either install it explicitly or write the CSS equivalent instead of importing.
+- **Tailwind version lock**: Tailwind v3 and v4 are *not* syntax-compatible. Check the `tailwindcss` version in `package.json` first:
+  - v3: classic config in `tailwind.config.js`, `@tailwind base/components/utilities` directives.
+  - v4: `@import "tailwindcss"`, `@theme` in CSS, `@tailwindcss/postcss` plugin (not plain `tailwindcss`). Do not put `tailwindcss` directly in `postcss.config.js` on v4.
+  - Using v4 syntax in a v3 project silently produces no styles; the page renders as unstyled HTML and the error looks like "nothing is applying."
+- **RSC and motion libraries**: in a Next.js App Router project, motion libraries (`framer-motion`, `gsap`) and anything using `useState`/`useEffect`/browser APIs must live inside a Client Component (`'use client'` at the top of the file). Isolate the interactive piece as a small leaf component so the rest of the tree stays server-rendered.
+- **Mixing motion systems**: do not mix GSAP and Framer Motion inside the same component tree — their animation clocks fight each other. Default to Framer Motion for UI interactions; reserve GSAP + ScrollTrigger for full-page scroll sequences in isolated wrappers with explicit `useEffect` cleanup.
+
+## Creative Arsenal
+
+When the locked direction calls for something visually distinctive and reflex patterns aren't enough, pull from this list of concrete, implementable concepts. None of these are defaults — use them only when they serve the committed thesis.
+
+**Navigation and entry points**
+
+- Dock magnification (Mac OS style): icons scale fluidly on hover proximity
+- Magnetic buttons: CTA pulls slightly toward the cursor using `useMotionValue` and `useTransform` (do not implement with `useState` — it collapses performance on mobile)
+- Morphing menus: a pill-shaped primary CTA that expands into its full dialog on click
+- Full-screen mega menu reveal: dropdown stagger-fades entire content sections
+- Floating speed dial: FAB springs out into a curved arc of secondary actions
+- Dynamic-island-style status pill: morphs to show transient alerts and collapses back
+
+**Layout and grids**
+
+- Bento grid: asymmetric tile composition (3-col row + 2-col 70/30 row is a good default)
+- Masonry: staggered grid without fixed row heights
+- Split-screen scroll: two halves slide in opposite directions on scroll
+- Horizontal scroll hijack: vertical scroll translates to horizontal gallery pan (restrict to a bounded section, not the full page)
+- Sticky scroll stack: cards pin and physically stack over each other as you scroll past
+
+**Cards and containers**
+
+- Parallax tilt card: 3D transform tracks mouse position (cap at 8° — more feels like a toy)
+- Spotlight border: card border illuminates under cursor using a radial gradient masked to the border
+- Holographic foil: iridescent hue-shift on hover, keyed to mouse X/Y
+- Morphing modal: button physically expands into its dialog container using `layoutId`
+
+**Typography as a visual element**
+
+- Kinetic marquee: infinite text band that reverses or speeds up on scroll
+- Text mask reveal: massive type as a transparent window to video or image behind
+- Character scramble on load or hover (Matrix-style decoding, used sparingly)
+- SVG text on a circular path
+- Gradient stroke running along outlined type
+
+**Scroll animation**
+
+- Scroll-linked video or 3D sequence (frame tied to scrollbar position)
+- SVG line drawing that reveals itself along a scroll progress path
+- Parallax zoom on a background image, keyed to scroll
+- Scroll-linked text blur-to-sharp reveal
+
+**Micro-interactions**
+
+- Skeleton shimmer: light sweep across placeholder blocks during loading
+- Directional hover fill: fill enters from the exact side the cursor crossed into
+- Ripple click effect: visual wave from exact click coordinates
+- Particle explosion on button success (sparingly — one CTA per page, not every button)
+- Mesh gradient background: organic lava-lamp color blobs (GPU-accelerated, pointer-events: none)
+
+**Implementation notes for the arsenal**
+
+- Any effect that runs continuously (marquees, infinite loops, mesh gradients) must be memoized and isolated in its own component so it does not cause parent re-renders.
+- Grain/noise filters go on `fixed inset-0 pointer-events-none z-50` overlays, never inside scrolling content — continuous repaints kill mobile frame rate.
+- Magnetic hover, scroll parallax, and any mouse-linked transform must use compositor-friendly properties (`transform`, `opacity`) and read position outside the React render cycle via `useMotionValue`.
+- GSAP ScrollTrigger and ThreeJS canvases belong in their own isolated wrapper components with explicit `useEffect` cleanup — leaking scroll listeners or WebGL contexts is the most common production bug.
+- Honor `prefers-reduced-motion`: every entry in the arsenal must have a reduced-motion fallback that either disables the effect entirely or reduces it to a simple opacity fade.
+
+## Bento Motion Paradigm (SaaS Dashboards)
+
+When the locked direction is a modern SaaS dashboard or feature-grid section — the "Vercel-core meets Dribbble-clean" territory — the static-card paradigm is not enough. Apply this pattern instead.
+
+**Surface**
+
+- Canvas: off-white (`#f9fafb`, `#fafafa`) in light mode or near-black (`#08090a`) in dark. Not pure white or pure black.
+- Cards: pure white (`#ffffff`) in light mode or `rgba(255,255,255,0.02–0.05)` over canvas in dark mode.
+- Border: translucent hairline (`border-slate-200/50` or `border-white/5`) — not solid `border-slate-200`.
+- Radius: large and consistent (`rounded-[2rem]` to `rounded-[2.5rem]` on outer cards). Apply concentric radius math for nested rounded elements.
+- Shadow: diffusion shadow, wide and soft, not the default boxy drop shadow. Example: `shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)]`. Tint the shadow toward the canvas hue.
+- Padding: generous (`p-8` to `p-10` inside cards). Cockpit-dense dashboards are a different paradigm — do not mix them.
+- Labels: place card titles and descriptions *outside and below* each tile, not inside. The card becomes a clean visual surface, the labels become a gallery-style caption.
+
+**Motion philosophy**
+
+Every card should feel alive, not static. The phrase "perpetual micro-interaction" captures it: a low-amplitude, continuously running loop that signals the surface is responsive without demanding attention.
+
+- **Spring physics, not linear easing**: `{ type: "spring", stiffness: 100, damping: 20 }` (or the CSS equivalent with `cubic-bezier`). No `ease-out`, no `linear`.
+- **Layout transitions**: use Framer Motion's `layout` and `layoutId` for state changes — reordering, resizing, shared-element hand-offs between views. This is the single highest-leverage motion primitive in this paradigm.
+- **Staggered reveals**: lists and grids mount with `staggerChildren` — children appear in sequence, not all at once. The parent variants and children must sit in the same client component tree; if data is fetched async, pass it as props into a central motion wrapper.
+- **Infinite loops, isolated**: every "alive" card has a micro-loop (pulse, float, shimmer, typewriter cycle, auto-reorder). Each loop lives in its own small Client Component wrapped in `React.memo` so it cannot trigger parent re-renders. A dashboard where every card infinite-loops inside a shared parent will drop frames on mobile.
+- **`AnimatePresence` for transient elements**: notifications, tooltips, modals, toasts.
+
+**Archetype cards (pick 3–5 for a dashboard section, not all)**
+
+- **Intelligent list**: vertical stack where items auto-sort over time via `layoutId`, simulating a priority queue or AI ranking
+- **Command input**: search or prompt bar with a typewriter cycle through multiple sample prompts, blinking cursor, shimmering processing state
+- **Live status**: calendar or schedule surface with "breathing" status dots and notification badges that overshoot on entry and linger briefly
+- **Data stream**: horizontal infinite carousel of metric tiles (`x: ["0%", "-100%"]` with seamless looping)
+- **Focus mode**: a document preview with a staggered highlight sweep and a floating-toolbar entry on hover
+
+**When not to use this paradigm**
+
+- Editorial or brand-led pages: the bento grid is utility-first and competes with strong editorial typography.
+- Cockpit-dense dashboards (trading, observability, SRE): cards with generous padding destroy data density. Use border dividers and `font-mono` for numbers instead.
+- Documentation, reading apps, content-forward surfaces: these need a reading column, not a grid of tiles.
+
 ---
 
+*Content Realism, Responsive Hazards, Dependency and Stack Verification, Creative Arsenal, and Bento Motion Paradigm are paraphrased and expanded from concepts in [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) (no explicit license at time of merge — ideas and rules used under fair use, no verbatim text copied). Original credit to the taste-skill author for surfacing these specific failure modes and patterns.*
+
 *Rules in Reflex Fonts, Font Selection, OKLCH, Theme Matrix, Absolute Bans, Motion Specifics, and AI Slop Test adapted from [pbakaus/impeccable](https://github.com/pbakaus/impeccable) (Apache 2.0). DESIGN.md Scaffold adapted from [getdesign.md](https://getdesign.md) (MIT); concept credited to Google Stitch.*
+
+*Core skill structure, direction-lock procedure, gotchas table, and Non-Negotiable Constraints extracted from [tw93/waza](https://github.com/tw93/waza) `skills/design` (MIT, © Tw93). See `LICENSE.upstream`.*
