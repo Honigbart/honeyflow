@@ -58,6 +58,20 @@ foreach ($skill in $skills) {
 
 The skills will be available in your next Claude Code session.
 
+## Optional: Codex CLI
+
+Three skills (`/brainstorm-critique`, `/quick-critique`, `/execute-review`) and `/autopilot` use [Codex CLI](https://github.com/openai/codex) as an independent reviewer. If Codex is installed, it runs the critique/review. If it's not installed (or hits a usage limit, auth failure, etc.), the skills fall back automatically to a Claude subagent — no manual intervention needed.
+
+To install Codex CLI:
+
+```bash
+npm install -g @openai/codex
+```
+
+You'll need an `OPENAI_API_KEY` in your environment. See the [Codex CLI docs](https://github.com/openai/codex) for setup details.
+
+**Without Codex CLI, the full pipeline still works.** You just get Claude-on-Claude review instead of Claude-vs-Codex review.
+
 ## How it works
 
 All state lives under `.ai/` in your project root:

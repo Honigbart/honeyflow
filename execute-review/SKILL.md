@@ -283,7 +283,7 @@ This form has Codex read the files itself and write the output file directly. Af
 
 Codex has priority for this skill. Always attempt Codex first (preferred form, then simplified form). Never assume an earlier failure is still in effect.
 
-If both Codex invocations fail:
+If both Codex invocations fail (including `command not found` when Codex is not installed, usage limits, auth failures, or process errors):
 - **Use a subagent for review instead of reviewing your own work directly.** Self-review has an inherent blind-spot problem — you are checking code you just orchestrated and will unconsciously anchor to your own reasoning. A subagent starts with a fresh context window and approaches the code as an independent reader.
 - Spawn an Agent with `subagent_type: "general-purpose"` and a review prompt that includes:
   - The phase number, name, objective, and definition of done

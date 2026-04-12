@@ -179,7 +179,7 @@ Never leave a phase `in disagreement` during autopilot. Always resolve it and mo
 
 ### Codex unavailable
 
-If Codex CLI fails (rate limit, quota, auth, process error):
+If Codex CLI fails (not installed, rate limit, quota, auth, process error):
 - **Use a subagent for review instead of reviewing your own work directly.** Self-review has an inherent blind-spot problem — you are checking your own implementation and will unconsciously anchor to your own reasoning. A subagent starts with a fresh context window, has not seen your trade-offs or implementation decisions, and approaches the code as a genuinely independent reader.
 - Spawn an Agent with `subagent_type: "general-purpose"` and a review prompt that includes:
   - The phase number, name, objective, and definition of done

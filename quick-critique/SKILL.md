@@ -215,7 +215,7 @@ This form has Codex read the file itself and write the output file directly. Aft
 
 Codex has priority for this skill. Always attempt the Codex critique first for each invocation (preferred form, then simplified form). Never assume an earlier usage-limit failure is still in effect.
 
-If both Codex invocations fail in the current invocation:
+If both Codex invocations fail in the current invocation (including `command not found` when Codex is not installed, usage limits, auth failures, or process errors):
 - do not stop or ask for permission — fall back automatically to keep the user's flow unbroken
 - **Use a subagent for the critique instead of critiquing directly.** If Claude orchestrated the plan creation (e.g., via `/quick-plan` in the same session), critiquing it directly means anchoring to the same reasoning. A subagent starts with a fresh context window and evaluates the plan independently.
 - Spawn an Agent with `subagent_type: "general-purpose"` and a prompt that includes:
