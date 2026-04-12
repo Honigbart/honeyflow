@@ -238,11 +238,52 @@ EOF
 
 **Timing note:** The `--output-last-message` flag writes `review.md` only when the Codex process exits, not during execution. Always wait for the command to complete before reading the output file. Do not run the Codex command in the background — run it synchronously so the file is guaranteed to exist when the next step begins.
 
-## Codex fallback rule
+## Simplified Codex fallback
 
-Codex has priority for this skill. Always attempt Codex first. Never assume an earlier failure is still in effect.
+If the preferred pipe-based command fails (e.g., `--output-last-message` not supported, pipe error, or older Codex version), try the simpler `codex exec "<prompt>"` form before falling back to a Claude subagent:
 
-If Codex CLI is unavailable or the shell command fails:
+```bash
+mkdir -p .ai/plans/<slug> && \
+codex exec -C . --skip-git-repo-check --full-auto \
+  "You are reviewing phase <X>: <phase name>.
+
+Review only the implementation relevant to this phase.
+
+Phase objective: <objective>
+Definition of done: <definition of done>
+Files in scope: <one file per line>
+
+Plan context: Read .ai/plans/<slug>/final_plan.md for full context — especially accepted/rejected critiques and architecture sections.
+
+Test command: <test command(s) or 'not specified'>
+Prior review state: <review status and prior notes>
+
+Review instructions:
+- Focus on behavioral bugs, regressions, unmet definition of done, missing tests, and medium/high severity issues
+- Do not flag intentional design decisions documented in the plan as bugs
+- Stay scoped to this phase and these files
+- Avoid style-only comments unless they hide real risk
+- If test command(s) are provided, run them to independently verify
+- Keep the output brief
+
+Write your review as markdown to .ai/plans/<slug>/review.md using these sections:
+# Phase Review
+## 1. Review Target
+## 2. Codex Initial Review
+## 3. Claude Fix Pass
+## 4. Codex Re-review
+## 5. Codex Fix Pass
+## 6. Claude Final Review
+## 7. Final Outcome" 2>&1
+```
+
+This form has Codex read the files itself and write the output file directly. After it finishes, verify `.ai/plans/<slug>/review.md` exists and is substantive.
+
+## Claude subagent fallback rule
+
+Codex has priority for this skill. Always attempt Codex first (preferred form, then simplified form). Never assume an earlier failure is still in effect.
+
+If both Codex invocations fail:
 - **Use a subagent for review instead of reviewing your own work directly.** Self-review has an inherent blind-spot problem — you are checking code you just orchestrated and will unconsciously anchor to your own reasoning. A subagent starts with a fresh context window and approaches the code as an independent reader.
 - Spawn an Agent with `subagent_type: "general-purpose"` and a review prompt that includes:
   - The phase number, name, objective, and definition of done

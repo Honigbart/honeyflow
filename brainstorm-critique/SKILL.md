@@ -171,11 +171,53 @@ It should separate true blockers from lower-priority concerns.
 
 If the critique is weak or clearly failed, say so instead of pretending it succeeded.
 
-## Fallback rule
+## Simplified Codex fallback
 
-Codex has priority for this skill. Always attempt the Codex critique first for each invocation. Never assume an earlier usage-limit failure is still in effect.
+If the preferred pipe-based command fails (e.g., `--output-last-message` not supported, pipe error, or older Codex version), try the simpler `codex exec "<prompt>"` form before falling back to a Claude subagent:
 
-If Codex CLI is unavailable or the shell command fails in the current invocation:
+```bash
+mkdir -p .ai/plans/<slug> && \
+codex exec -C . --skip-git-repo-check --full-auto \
+  "Read the file .ai/plans/<slug>/<input-file> and critique it.
+
+You are a skeptical principal engineer and product critic.
+Critique this planning artifact rigorously, but calibrate to the actual project stage and scope.
+
+If the artifact is an evolution plan, critique it as a grounded v2 proposal rather than as greenfield brainstorming.
+
+Assume a solo-dev or small-team pre-launch context unless the artifact explicitly says otherwise.
+Do not assume enterprise scale, high traffic, many customers, strict compliance requirements, or complex operations unless stated.
+Do not frame routine UI/layout work as major architecture risk unless it would realistically cause correctness, migration, or multi-session maintenance problems.
+Be direct, but avoid melodramatic language or inflated severity.
+
+Focus on:
+1. weak assumptions
+2. overengineering
+3. hidden costs
+4. migration risk
+5. integration risk
+6. missing edge cases
+7. simpler alternatives
+
+For each major point, indicate severity as one of:
+- real blocker
+- worth considering
+- minor nit
+
+Prefer short, concrete findings over long risk essays.
+Include a brief final stance on which concerns should actually change the plan versus which ones can safely be ignored for now.
+
+Write the critique as markdown to .ai/plans/<slug>/codex_critique.md.
+Return only markdown." 2>&1
+```
+
+This form has Codex read the file itself and write the output file directly. After it finishes, verify `.ai/plans/<slug>/codex_critique.md` exists and is substantive.
+
+## Claude subagent fallback rule
+
+Codex has priority for this skill. Always attempt the Codex critique first for each invocation (preferred form, then simplified form). Never assume an earlier usage-limit failure is still in effect.
+
+If both Codex invocations fail in the current invocation:
 - do not stop or ask for permission — fall back automatically to keep the user's flow unbroken
 - **Use a subagent for the critique instead of critiquing directly.** The same blind-spot problem that affects code review also affects plan critique: if Claude just wrote the brainstorm or evolution plan in the same session, critiquing it directly means anchoring to the same reasoning. A subagent starts with a fresh context window and no knowledge of why the plan was written the way it was.
 - Spawn an Agent with `subagent_type: "general-purpose"` and a prompt that includes:
