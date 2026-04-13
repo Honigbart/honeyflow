@@ -1,6 +1,6 @@
 ---
 name: quick-critique
-description: Use this skill when an active plan's .ai/plans/<slug>/final_plan.md should be critiqued by Codex CLI as a skeptical external reviewer — especially for plans created via quick-plan that had no brainstorm-critique step. Produces .ai/plans/<slug>/codex_critique.md and should also add .ai/plans/<slug>/ollama_critique.md when the local Ollama reviewer is available.
+description: Use this skill when an active plan's .ai/plans/<slug>/final_plan.md should be critiqued by Codex CLI as a skeptical external reviewer — especially for plans created via quick-plan that had no brainstorm-critique step. Produces .ai/plans/<slug>/codex_critique.md, should also add .ai/plans/<slug>/ollama_critique.md when the local Ollama reviewer is available, and supports `--apply` to immediately re-run quick-plan with the critique incorporated.
 ---
 
 # Quick Critique Skill
@@ -16,6 +16,7 @@ Use this skill when:
 - the plan was created via `quick-plan` (or any other path) without a prior Codex critique
 - the user wants a skeptical external review before starting execution
 - the critique should come from Codex, not from Claude alone
+- the user may explicitly request `/quick-critique --apply` to critique and immediately re-plan in one invocation
 
 Do not use this skill for:
 - critiquing a brainstorm artifact — use `brainstorm-critique` instead
@@ -65,7 +66,7 @@ All pipeline skills operate on **namespaced plans**. Each plan has a unique slug
 - `execute-review` finishing the last required phase review → copies plan dir to `.ai/archive/<slug>/`, deletes `.ai/plans/<slug>/`, sets status to `completed`.
 - `evolve` creates a NEW plan slug + directory referencing a previous plan. Writes `evolution_plan.md` in the new directory.
 
-**This skill's state responsibility:** Read `final_plan.md` from `.ai/plans/<slug>/`, write `.ai/plans/<slug>/codex_critique.md`, and write `.ai/plans/<slug>/ollama_critique.md` too when the local Ollama reviewer is available. This skill does **not** read or modify plan state files (`execution_state.md`, `session_log.md`). It does **not** modify `final_plan.md`.
+**This skill's state responsibility:** Read `final_plan.md` from `.ai/plans/<slug>/`, write `.ai/plans/<slug>/codex_critique.md`, and write `.ai/plans/<slug>/ollama_critique.md` too when the local Ollama reviewer is available. If the user invoked `/quick-critique --apply`, this skill also immediately performs the same re-plan behavior as `quick-plan` for the same slug: overwrite `final_plan.md` with the critique incorporated, then delete the stale critique artifacts. It does **not** read or modify execution state files (`execution_state.md`, `session_log.md`).
 
 ## Legacy layout detection
 
@@ -78,6 +79,8 @@ Do not proceed with the legacy layout.
 ## Plan slug resolution
 
 Every invocation must resolve a plan slug before doing work.
+
+Treat `--apply` as a mode flag, not as the slug.
 
 1. If the user provided a slug explicitly (e.g., `/quick-critique fix-sidebar-layout`), use it.
 2. If not, read `.ai/plans.md`.
@@ -170,6 +173,35 @@ After Codex finishes:
    - biggest concern raised
    - strongest confirmation of the plan
    - suggested next step: re-run `/quick-plan <slug>` to incorporate findings, or proceed with `/execute-plan` if no blockers
+
+## `--apply` mode
+
+If the user invoked `/quick-critique --apply` (with or without an explicit slug), do **not** stop after producing the critique artifacts.
+
+Instead, continue in the same invocation:
+1. finish the Codex critique pass
+2. run the local Ollama critique too if available
+3. re-run the `quick-plan` re-plan behavior for the same slug immediately
+4. overwrite `.ai/plans/<slug>/final_plan.md` with the updated plan
+5. delete stale `.ai/plans/<slug>/codex_critique.md` and `.ai/plans/<slug>/ollama_critique.md` after the new plan is written
+
+This is intentionally equivalent to:
+
+```text
+/quick-critique <slug>
+/quick-plan <slug>
+```
+
+but done as one fast path.
+
+Rules for `--apply`:
+- critique first, then re-plan
+- preserve the same slug
+- follow `quick-plan`'s re-plan rules and final plan structure
+- do not silently keep stale critique artifacts after applying them
+- if execution has already started for the slug, do not auto-apply; warn and stop instead
+- if the critique is empty or clearly failed, do not auto-apply; surface the failure instead
+- if Codex was unavailable and only fallback critique exists, you may still apply it, but preserve provenance honestly in `## 4. Accepted Critiques`
 
 ## Local Ollama third voice
 
@@ -311,6 +343,8 @@ After the user reads the critique, they may choose to:
 1. **Re-plan:** Run `/quick-plan <slug>` again. Quick-plan will read `codex_critique.md` and `ollama_critique.md` if present, incorporate relevant findings into the updated `final_plan.md`, and then delete the stale critique artifacts.
 2. **Proceed anyway:** Run `/execute-plan <slug>` directly. The critique remains as documentation but does not block execution.
 
+If the user invoked `/quick-critique --apply`, this skill takes option 1 automatically in the same invocation instead of stopping after the critique.
+
 This skill does not enforce either path. It produces the critique and lets the user decide.
 
 ## Style rules
@@ -324,8 +358,9 @@ This skill does not enforce either path. It produces the critique and lets the u
 ## File handling
 
 Before finishing:
-1. Ensure `.ai/plans/<slug>/codex_critique.md` exists if Codex succeeded or the user explicitly approved the temporary Claude fallback
-2. Ensure it contains meaningful markdown and is not just whitespace
-3. Ensure the critique clearly targets the `final_plan.md` content
+1. If `--apply` was **not** used: ensure `.ai/plans/<slug>/codex_critique.md` exists if Codex succeeded or the user explicitly approved the temporary Claude fallback
+2. If `--apply` was **not** used: ensure the critique contains meaningful markdown and is not just whitespace
+3. If `--apply` was **not** used: ensure the critique clearly targets the `final_plan.md` content
 4. If Claude fallback was used, ensure the provenance note is explicit and truthful
-5. Then provide a short in-chat summary of the result
+5. If `--apply` **was** used: ensure `.ai/plans/<slug>/final_plan.md` was updated and stale critique artifacts were deleted
+6. Then provide a short in-chat summary of the result

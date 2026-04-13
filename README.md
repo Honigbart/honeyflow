@@ -12,7 +12,7 @@ The goal is simple: think before you build, get a second opinion, execute with d
 | `/brainstorm-critique` | Sends the brainstorm to Codex CLI for a skeptical review. |
 | `/brainstorm-synthesize` | Merges brainstorm + critique into a decisive `final_plan.md`. |
 | `/quick-plan` | Creates `final_plan.md` directly for smaller, well-understood tasks. |
-| `/quick-critique` | Sends a quick plan to Codex CLI for review. |
+| `/quick-critique` | Sends a quick plan to Codex CLI for review. Supports `--apply` to immediately re-run quick-plan with the critique incorporated. |
 | `/execute-plan` | Phase-by-phase implementation with durable state tracking across sessions. |
 | `/execute-review` | Post-implementation review per phase through a Claude/Codex loop. |
 | `/quality-eval` | Durable qualitative evaluation for slow comparisons, output-quality checks, and fresh-session handoff via `.ai/evals/<slug>/`. |
@@ -254,15 +254,12 @@ You:    /quick-plan add-rate-limiting
 Claude: [inspects codebase, writes final_plan.md with 2 phases]
         "2 phases: middleware + tests. Run /quick-critique or /execute-plan next."
 
-You:    /quick-critique
+You:    /quick-critique --apply add-rate-limiting
 
 Claude: [runs Codex CLI, writes codex_critique.md]
-        "Codex says: consider Redis backend for multi-instance, but minor nit for now."
-
-You:    /quick-plan add-rate-limiting
-        (re-running incorporates the critique findings into an updated plan)
-
-Claude: [reads codex_critique.md, updates final_plan.md]
+Claude: [optionally runs local Ollama critique too]
+Claude: [immediately re-runs quick-plan behavior for the same slug]
+        "Plan tightened: Redis remains deferred, but multi-instance rollout caveat is now explicit."
 
 You:    /execute-plan
 Claude: [implements phase 1, commits]
@@ -274,7 +271,7 @@ You:    /execute-review
 Claude: [Codex reviews, clean, archives plan]
 ```
 
-The `/quick-critique` step is optional. If the task is straightforward, go straight from `/quick-plan` to `/execute-plan`.
+The `/quick-critique` step is optional. If the task is straightforward, go straight from `/quick-plan` to `/execute-plan`. If you already know you want to incorporate critique immediately, use `/quick-critique --apply` as the fast path.
 
 ### Evolve flow
 
