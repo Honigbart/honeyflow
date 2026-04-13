@@ -148,6 +148,18 @@ Return only markdown."
 
 This form is preferred because `--output-last-message` writes the final assistant message directly to `.ai/plans/<slug>/codex_critique.md` instead of relying on raw stdout redirection.
 
+**Important command-shape note:** Do **not** insert `-` before the prompt string in this form. The correct shape is:
+- piped stdin = the plan contents
+- positional prompt argument = the critique instructions
+
+So use:
+- `cat final_plan.md | codex exec ... "instructions"`
+
+Not:
+- `cat final_plan.md | codex exec ... - "instructions"`
+
+If you add `-`, Codex treats stdin as the prompt source and the quoted instructions become an unexpected extra argument, which causes a CLI parse error.
+
 ## After execution
 
 After Codex finishes:
