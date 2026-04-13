@@ -65,7 +65,7 @@ All pipeline skills operate on **namespaced plans**. Each plan has a unique slug
 - `execute-review` finishing the last required phase review → copies plan dir to `.ai/archive/<slug>/`, deletes `.ai/plans/<slug>/`, sets status to `completed`.
 - `evolve` creates a NEW plan slug + directory referencing a previous plan. Writes `evolution_plan.md` in the new directory.
 
-**This skill's state responsibility:** Read `final_plan.md` from `.ai/plans/<slug>/`, write `.ai/plans/<slug>/codex_critique.md`, and optionally write `.ai/plans/<slug>/ollama_critique.md` when the local Ollama reviewer is available. This skill does **not** read or modify plan state files (`execution_state.md`, `session_log.md`). It does **not** modify `final_plan.md`.
+**This skill's state responsibility:** Read `final_plan.md` from `.ai/plans/<slug>/`, write `.ai/plans/<slug>/codex_critique.md`, and write `.ai/plans/<slug>/ollama_critique.md` too when the local Ollama reviewer is available. This skill does **not** read or modify plan state files (`execution_state.md`, `session_log.md`). It does **not** modify `final_plan.md`.
 
 ## Legacy layout detection
 
@@ -175,7 +175,7 @@ After Codex finishes:
 
 After a successful Codex critique, run a local supplemental critique whenever both of these are true:
 - `ollama` is installed and callable
-- `ollama list` shows `gemma4-plan-critic` (typically `gemma4-plan-critic:latest`)
+- `ollama list` shows `local-reviewer` (typically `local-reviewer:latest`)
 
 This is required when available, but non-blocking on failure:
 - if the model is unavailable, skip it silently
@@ -224,7 +224,7 @@ Return only markdown.
 EOF
 printf '\n\n# Final Plan\n\n'
 cat .ai/plans/<slug>/final_plan.md
-} | ollama run --hidethinking --think false gemma4-plan-critic:latest \
+} | ollama run --hidethinking --think false local-reviewer:latest \
   > .ai/plans/<slug>/ollama_critique.md
 ```
 

@@ -1,6 +1,6 @@
 # Claude Code Planning Skills
 
-A set of skills for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that bring structured planning, execution, and review to your projects. Plans get critiqued by [Codex CLI](https://github.com/openai/codex) as an independent skeptical reviewer, and completed implementation phases go through a bounded Claude/Codex review loop before the plan is archived. If you want extra local scrutiny, the critique and review skills can also add an optional Ollama-based third voice.
+A set of skills for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that bring structured planning, execution, and review to your projects. Plans get critiqued by [Codex CLI](https://github.com/openai/codex) as an independent skeptical reviewer, and completed implementation phases go through a bounded Claude/Codex review loop before the plan is archived. If you want extra local scrutiny, the critique and review skills can also add a local Ollama-based third voice.
 
 The goal is simple: think before you build, get a second opinion, execute with discipline, and review what you shipped.
 
@@ -83,20 +83,34 @@ This is deliberately a supplement, not a new primary gate:
 - If `ollama` and the configured local model are available, the skills should attempt the Ollama pass.
 - Missing Ollama, missing local model, or a local Ollama failure must not break the normal workflow.
 
-Two Modelfiles are included in this repo:
+The skills look for this local Ollama model alias:
 
-- `ollama-models/Modelfile-gemma4-26b-plan-critic`
-- `ollama-models/Modelfile-gemma4-26b-code-reviewer`
+- `local-reviewer:latest`
 
-They are designed for the [unsloth/gemma-4-26B-A4B-it-GGUF](https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF) family on Ollama. A good default is:
+You can back that alias with Gemma, Qwen, or another instruction-following local model. The skills do **not** require Gemma specifically. They only require that this alias exists and that the backing model is good enough at critique/review-style instruction following.
+
+The recommended shared Modelfile in this repo is:
+
+- `ollama-models/Modelfile-gemma4-26b-reviewer`
+
+This shared reviewer alias is preferred over separate plan/code aliases because it reduces duplicate model residency pressure while still letting the skills specialize behavior through task-specific prompts.
+
+They use the [unsloth/gemma-4-26B-A4B-it-GGUF](https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF) family as one strong default. A good starting point is:
 
 - `gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf`
 
-If you need a smaller option, switch the `FROM` line in the Modelfile to a different filename from the same Hugging Face repo, for example:
+Hardware note:
+- a 26B-class local model can require substantial VRAM and/or system RAM
+- whether it runs well depends on your quant, context size, GPU offload, and Ollama setup
+- do not assume a laptop or smaller GPU will handle the default example comfortably
+
+If that is too heavy, use a smaller or more aggressively quantized variant, for example:
 
 - `gemma-4-26B-A4B-it-UD-IQ4_NL.gguf`
 
-Example setup:
+You are also not restricted to Gemma 4. If you prefer a different local model family such as Qwen Coder, edit the `FROM ...` line in the Modelfile and keep the alias names the same when you run `ollama create`.
+
+Gemma-based example setup:
 
 ```bash
 cd ~/honeyflow/claude-skills
@@ -107,17 +121,19 @@ huggingface-cli download unsloth/gemma-4-26B-A4B-it-GGUF \
   --local-dir ollama-models/weights
 
 cd ollama-models
-ollama create gemma4-plan-critic -f Modelfile-gemma4-26b-plan-critic
-ollama create gemma4-code-reviewer -f Modelfile-gemma4-26b-code-reviewer
+ollama create local-reviewer -f Modelfile-gemma4-26b-reviewer
 ```
 
 Notes:
 - The `ollama-models/weights/` directory is gitignored on purpose. Keep local GGUF weights there without polluting the repo.
 - If you use a different GGUF filename or quant, edit the `FROM ./weights/...` line in the Modelfile before running `ollama create`.
-- The skills expect these local model names by default:
-  - `gemma4-plan-critic:latest`
-  - `gemma4-code-reviewer:latest`
-- `/plan-migrate` is not needed for this addition. `ollama_critique.md` and `ollama_review.md` are optional artifacts created lazily only when the local Ollama reviewer actually runs.
+- If you want to use another Ollama base model entirely, you can also change the `FROM` line to something like an existing local Ollama model tag instead of a GGUF path.
+  Example:
+  `FROM qwen2.5-coder:14b`
+- The skills expect this alias name by default:
+  - `local-reviewer:latest`
+- The backing base model is your choice. Gemma 4 is one option, not a requirement.
+- `/plan-migrate` is not needed for this addition. `ollama_critique.md` and `ollama_review.md` are extra artifacts that appear only when the local Ollama reviewer is configured and actually runs.
 
 ## How it works
 

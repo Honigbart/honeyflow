@@ -307,7 +307,7 @@ This form has Codex read the files itself and write the output file directly. Th
 
 After a successful Codex initial review, run a local supplemental review whenever all of these are true:
 - `ollama` is installed and callable
-- `ollama list` shows `gemma4-code-reviewer` (typically `gemma4-code-reviewer:latest`)
+- `ollama list` shows `local-reviewer` (typically `local-reviewer:latest`)
 - the review packet is small enough to fit honestly in one local prompt
 
 Use conservative judgment for packet size. If the phase scope is broad, the file list is long, or the relevant files are too large to include faithfully, skip the Ollama pass instead of pretending partial input was a full review.
@@ -354,7 +354,7 @@ printf '\n## FILE: <path-1>\n'
 sed -n '1,260p' <path-1>
 printf '\n## FILE: <path-2>\n'
 sed -n '1,260p' <path-2>
-} | ollama run --hidethinking --think false gemma4-code-reviewer:latest \
+} | ollama run --hidethinking --think false local-reviewer:latest \
   > .ai/plans/<slug>/ollama_review.md
 ```
 
