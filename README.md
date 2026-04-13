@@ -15,6 +15,7 @@ The goal is simple: think before you build, get a second opinion, execute with d
 | `/quick-critique` | Sends a quick plan to Codex CLI for review. |
 | `/execute-plan` | Phase-by-phase implementation with durable state tracking across sessions. |
 | `/execute-review` | Post-implementation review per phase through a Claude/Codex loop. |
+| `/quality-eval` | Durable qualitative evaluation for slow comparisons, output-quality checks, and fresh-session handoff via `.ai/evals/<slug>/`. |
 | `/autopilot` | Fully autonomous execution + review of all phases. No user input needed. |
 | `/evolve` | Takes a completed plan and proposes a grounded v2 direction. |
 | `/todo` | Lightweight project todo list with priority buckets. Feeds context into planning. |
@@ -36,7 +37,7 @@ Then symlink each skill into your Claude Code skills directory.
 mkdir -p ~/.claude/skills
 
 for skill in brainstorm brainstorm-critique brainstorm-synthesize \
-             quick-plan quick-critique execute-plan execute-review \
+             quick-plan quick-critique execute-plan execute-review quality-eval \
              autopilot evolve todo plan-migrate; do
   ln -s ~/honeyflow/$skill ~/.claude/skills/$skill
 done
@@ -46,7 +47,7 @@ done
 
 ```powershell
 $skills = @("brainstorm","brainstorm-critique","brainstorm-synthesize",
-            "quick-plan","quick-critique","execute-plan","execute-review",
+            "quick-plan","quick-critique","execute-plan","execute-review","quality-eval",
             "autopilot","evolve","todo","plan-migrate")
 
 foreach ($skill in $skills) {
@@ -94,6 +95,19 @@ All state lives under `.ai/` in your project root:
 ```
 
 `todo.md` is global, not per-plan. It sits at `.ai/todo.md` and is shared across all plans. Plans reference specific todo items, and those references travel through the pipeline so they can be auto-completed when a plan is archived.
+
+For qualitative validation that is not normal unit/integration testing, `/quality-eval` uses a separate durable area:
+
+```
+.ai/
+└── evals/
+    └── <slug>/
+        ├── brief.md              # what to test and how
+        ├── results.md            # rolling conclusions and recommendation
+        └── runs/                 # optional raw outputs for long/slow comparisons
+```
+
+This is useful when a fresh session should continue a long-running output-quality check without reconstructing context from chat history.
 
 There are two paths into the pipeline:
 
