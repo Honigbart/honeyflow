@@ -252,6 +252,8 @@ Autopilot makes all decisions on its own. If Codex is unavailable, it falls back
 
 **Archive location.** Completed plans currently archive to `.ai/archive/<slug>/`. A future version may move this to `.ai/plans/archive/<slug>/` to keep everything under one roof. When that happens, `/plan-migrate` will handle the transition.
 
+**Recommended git policy for `.ai/`.** A good default is to version active workflow state but keep archived payloads local-only. In practice: track `.ai/plans.md`, `.ai/todo.md`, and active plan directories under `.ai/plans/<slug>/`, but ignore `.ai/archive/`. If `.ai/archive/` was previously tracked, remove it from the index once with `git rm -r --cached .ai/archive` and commit that change; the files stay on disk but stop creating churn in normal development. This is a git-tracking policy change only — it does **not** require `/plan-migrate`, because the on-disk `.ai/` layout stays the same. More generally: use `/plan-migrate` only when the artifact structure or directory layout changes, not when ignore rules or retention policy change.
+
 **Updating the skills.** When the skill format changes (new artifact structure, renamed fields, directory layout changes), `/plan-migrate` acts as the migration engine. It detects outdated layouts in your project and upgrades them to the current format, similar to how database migrations work. Pull the latest skills, and if your `.ai/` layout needs updating, `/plan-migrate` will tell you.
 
 ## License
