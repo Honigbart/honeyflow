@@ -96,6 +96,16 @@ Process exactly one eligible phase per invocation.
 
 If finishing that one phase makes the whole plan implementation-complete and review-complete, finalize the plan archive in the same invocation unless the user explicitly says not to.
 
+Narrow exception:
+- You may review multiple **adjacent** done phases together in one invocation only when all of the following are true:
+  - they were implemented in the same session or same tightly coupled implementation burst
+  - they form one cohesive feature slice rather than separate ship boundaries
+  - they touch substantially the same files or code paths
+  - later verification or integration testing clearly subsumes isolated per-phase review
+  - splitting the review would be mostly repetitive overhead with little additional signal
+- Do not use this exception for broad batching, convenience, or to skip meaningful review boundaries.
+- If you use it, treat the grouped phases as one bounded review target and record the justification in both `review_notes` and `session_log.md`, including exactly which phases were covered.
+
 Default selection rule:
 1. If a phase already has `review_status: in review`, `claude-fixed`, or `codex-fixed`, resume that phase. **Only one phase may be in an active review state at a time.** If multiple phases have active review statuses, stop and surface the inconsistency — this indicates a prior session crashed mid-review. Resume the earliest one.
 2. If a phase has `review_status: in disagreement`, it is eligible for re-review. Present the prior disagreement details from `review_notes` to the user and ask whether to re-run the review loop (which may resolve it with a fresh Codex invocation) or accept the current state and move on.
@@ -103,8 +113,8 @@ Default selection rule:
    - `status: done`
    - `review_status` missing, or `review_status: not reviewed`
 
-Do not automatically continue to the next phase after finishing one review.
-The user must invoke this skill again for the next phase.
+Do not automatically continue to the next phase after finishing one review group.
+The user must invoke this skill again for the next phase or eligible adjacent-phase group.
 
 ## Preconditions
 
@@ -138,7 +148,8 @@ If the fields already exist, preserve them and update only the target phase unle
 
 ## Phase selection rules
 
-- Review only one phase per invocation
+- Review only one phase per invocation by default
+- Exception: you may review one adjacent-phase group per invocation when the narrow exception above is satisfied
 - A new review may only start on a phase with `status: done`. If the selected phase has any other status (`not started`, `in progress`, `blocked`, `cancelled`), refuse to review it and say why. This prevents reviewing incomplete work.
 - Never skip an earlier eligible done phase unless the user explicitly says so
 - If no done phase is eligible, say so clearly and stop

@@ -137,6 +137,10 @@ Immediately after marking a phase `done`, review it. Follow the same rules as `e
 4. If clean: mark `reviewed`, archive review artifact, continue to next phase
 5. If findings: run the full Claude fix → Codex re-review → optional Codex fix → Claude final review loop
 
+Exception:
+- If the just-completed phase and the next adjacent done phase(s) clearly satisfy `execute-review`'s narrow grouped-review exception, you may review that adjacent phase group together instead of one-by-one.
+- When you do this, document the justification in both `review_notes` and `session_log.md`, including which phases were grouped and why separate reviews would have been redundant.
+
 **The key difference from manual review: you resolve disagreements autonomously.**
 
 ### Step C — Move to the next phase
