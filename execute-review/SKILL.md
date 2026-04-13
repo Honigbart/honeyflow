@@ -470,6 +470,7 @@ If any phase remains `in disagreement`, do not archive the plan unless the user 
 - Do not commit on a time-based cadence or merely because a review invocation happened
 - Use at most one Claude fix commit and one Codex fix commit per pass through the loop, unless Step 5 requires a final Codex fix commit
 - Do not create a commit for review notes, `review.md`, `execution_state.md`, todo updates, or archive bookkeeping alone
+- Exception: if this invocation finalizes the entire plan archive, stage and commit the finalization changes as one atomic commit with message `Archive completed plan <slug>`. That finalization commit should include the updated `.ai/plans.md`, any `.ai/todo.md` changes caused by linked todo completion, the archived `.ai/archive/<slug>/` snapshot, and the deletion of `.ai/plans/<slug>/`.
 - Never create empty commits
 - Never commit unrelated worktree changes
 - Stage only files within the reviewed phase scope, plus the minimal `.ai/` state files that truthfully record the review result

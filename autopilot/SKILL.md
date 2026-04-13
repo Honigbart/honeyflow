@@ -151,7 +151,8 @@ When every phase is `done` and `reviewed`:
 3. Copy `.ai/plans/<slug>/` to `.ai/archive/<slug>/`
 4. Update `.ai/plans.md`: set status to `completed`
 5. Delete `.ai/plans/<slug>/`
-6. Report to the user (see reporting section)
+6. Stage and commit the finalization changes as one atomic commit with message `Archive completed plan <slug>`. Include `.ai/plans.md`, any `.ai/todo.md` changes, the archived `.ai/archive/<slug>/` snapshot, and the deletion of `.ai/plans/<slug>/`.
+7. Report to the user (see reporting section)
 
 ## Autonomous decision rules
 
@@ -254,6 +255,7 @@ Follow the same implementation rules as `execute-plan`:
 
 - Commit after each phase is implemented and verified (before review)
 - Commit after review fixes (Claude fix commit, Codex fix commit — same format as `execute-review`)
+- Commit plan finalization as one atomic archival commit when the plan completes: `Archive completed plan <slug>`
 - Use clear messages tied to the phase: `Execute plan <slug> phase N: <short description>`
 - Review fix format: `Claude's fix of phase N code review: <short summary>` / `Codex fix of phase N code review: <short summary> (fixed by Codex)`
 - Never commit unrelated changes
