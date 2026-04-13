@@ -208,10 +208,10 @@ Prefer short, concrete findings over long risk essays.
 Include a brief final stance on which concerns should actually change the plan versus which ones can safely be ignored for now.
 
 Write the critique as markdown to .ai/plans/<slug>/codex_critique.md.
-Return only markdown." 2>&1
+Return only markdown." </dev/null 2>&1
 ```
 
-This form has Codex read the file itself and write the output file directly. After it finishes, verify `.ai/plans/<slug>/codex_critique.md` exists and is substantive.
+This form has Codex read the file itself and write the output file directly. The `</dev/null` redirect is intentional: it prevents Codex from trying to read extra interactive stdin and appending an unintended `<stdin>` block. After it finishes, verify `.ai/plans/<slug>/codex_critique.md` exists and is substantive.
 
 ## Claude subagent fallback rule
 

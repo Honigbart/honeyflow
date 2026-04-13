@@ -166,7 +166,17 @@ Reason:
 - the relevant context is the phase definition of done plus recorded touched files
 - the review should stay bounded to one phase, not drift into a generic repo review
 
-Only use `codex review` if the phase maps cleanly to an isolated commit or diff and file scope is obvious.
+Only use `codex review` if the phase maps cleanly to an isolated git diff and file scope is obvious.
+
+`codex review` is a generic repository diff review tool, not a plan-aware phase review tool. The available diff selectors are:
+- `codex review --uncommitted` — review staged, unstaged, and untracked changes in the current working tree. Use this only when the worktree is cleanly scoped to the current phase and there are no unrelated changes.
+- `codex review --base <branch>` — review the branch diff against a known base branch. Use this when the whole phase is represented by the current branch delta and that delta is not polluted by unrelated work.
+- `codex review --commit <sha>` — review the changes introduced by one specific commit. Use this when the phase maps to a single isolated commit or a clearly reviewable fix commit.
+
+Decision rule:
+- If the phase needs plan context, fixed markdown sections in `review.md`, multi-pass review state, or precise file scoping, use the hand-rolled `codex exec` prompt.
+- If the phase is cleanly represented by exactly one git diff shape above and you only need a bounded code review, `codex review` is acceptable.
+- If the git situation is ambiguous (multiple relevant commits, unrelated branch drift, or mixed uncommitted changes), do not use `codex review`; use the hand-rolled `codex exec` prompt instead.
 
 ## Preferred Codex review command
 
@@ -236,6 +246,8 @@ Return markdown with exactly these top-level sections:
 EOF
 ```
 
+**Stdin note:** When the prompt is piped on stdin as shown above, that stdin stream is intentional. Do not also leave an extra interactive stdin source attached for prompt-argument invocations later in the flow.
+
 **Timing note:** The `--output-last-message` flag writes `review.md` only when the Codex process exits, not during execution. Always wait for the command to complete before reading the output file. Do not run the Codex command in the background — run it synchronously so the file is guaranteed to exist when the next step begins.
 
 ## Simplified Codex fallback
@@ -274,10 +286,10 @@ Write your review as markdown to .ai/plans/<slug>/review.md using these sections
 ## 4. Codex Re-review
 ## 5. Codex Fix Pass
 ## 6. Claude Final Review
-## 7. Final Outcome" 2>&1
+## 7. Final Outcome" </dev/null 2>&1
 ```
 
-This form has Codex read the files itself and write the output file directly. After it finishes, verify `.ai/plans/<slug>/review.md` exists and is substantive.
+This form has Codex read the files itself and write the output file directly. The `</dev/null` redirect is intentional: it prevents Codex from trying to read extra interactive stdin and appending an unintended `<stdin>` block. After it finishes, verify `.ai/plans/<slug>/review.md` exists and is substantive.
 
 ## Claude subagent fallback rule
 
