@@ -165,6 +165,8 @@ All state lives under `.ai/` in your project root:
 
 `follow_ups.md` is also global, but it solves a different problem. It is the durable working registry for unresolved `## 14. Follow-on Artifacts` coming from active or archived final plans. Unlike `todo.md`, it preserves source-plan provenance and can be picked up later by `/follow-up` without re-scanning every archived plan.
 
+The registry is maintained by the bundled helper at `~/.claude/skills/follow-up/scripts/sync_follow_ups.py`. Planning and review skills should use that helper instead of hand-editing `follow_ups.md` whenever possible so IDs and section moves stay deterministic.
+
 For qualitative validation that is not normal unit/integration testing, `/quality-eval` uses a separate durable area:
 
 ```

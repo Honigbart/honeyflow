@@ -276,35 +276,16 @@ Before finishing:
 1. Ensure `.ai/plans/<slug>/final_plan.md` exists with all 16 required sections (section 15 may be omitted if no todo references)
 2. Ensure the roadmap phases are concrete and proportional
 3. If re-planning from critique: ensure the old plan snapshot exists in `.ai/plans/<slug>/superseded/` before overwrite
-4. Update `.ai/follow_ups.md`:
-   - ensure it exists with this format if missing:
-     ```markdown
-     # Follow-Ups
-
-     > Last updated: YYYY-MM-DD
-
-     ## Open
-
-     ## Started
-
-     ## Done
-
-     ## Superseded
-
-     ## Dropped
-     ```
-   - sync `## Open` entries for this source plan from `## 14. Follow-on Artifacts`
-   - use stable IDs like `FU-001`
-   - preserve unchanged open entries for this source plan
-   - if an earlier open entry from this source plan disappeared from the new `## 14`, move it to `## Superseded` instead of deleting it
-   - each entry must use this block shape:
-     ```markdown
-     ### FU-001 — <descriptive title>
-     - source_plan: <slug>
-     - source_status: active
-     - linked_plan: none
-     - notes: <short rationale or trigger>
-     ```
+4. Sync `.ai/follow_ups.md` with the bundled helper:
+   ```bash
+   python3 ~/.claude/skills/follow-up/scripts/sync_follow_ups.py \
+     sync-plan \
+     --source-plan "<slug>" \
+     --source-status active \
+     --plan-file ".ai/plans/<slug>/final_plan.md" \
+     --registry ".ai/follow_ups.md"
+   ```
+   This preserves stable `FU-*` IDs for unchanged open items from the same source plan, creates new IDs for new items, and moves removed open items for this source plan to `## Superseded`.
 5. If re-planning: delete stale `.ai/plans/<slug>/codex_critique.md` and `.ai/plans/<slug>/ollama_critique.md` if they existed
 6. Ensure `.ai/plans.md` has an entry for this slug with status `active`
 7. Then provide the short in-chat summary

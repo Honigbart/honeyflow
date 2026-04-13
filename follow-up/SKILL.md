@@ -80,6 +80,12 @@ Rebuild process:
 
 Normal usage after rebuild must read the registry, not re-scan all archives again.
 
+Use the bundled helper script for registry maintenance:
+
+```bash
+python3 ~/.claude/skills/follow-up/scripts/sync_follow_ups.py <subcommand> ...
+```
+
 ## Modes
 
 ### 1. List mode
@@ -87,8 +93,22 @@ Normal usage after rebuild must read the registry, not re-scan all archives agai
 Default behavior when no explicit action is given.
 
 Steps:
-1. Ensure `.ai/follow_ups.md` exists (rebuild if missing)
-2. Read `## Open` and `## Started`
+1. Ensure `.ai/follow_ups.md` exists:
+   ```bash
+   python3 ~/.claude/skills/follow-up/scripts/sync_follow_ups.py \
+     rebuild \
+     --plans-index ".ai/plans.md" \
+     --plans-dir ".ai/plans" \
+     --archive-dir ".ai/archive" \
+     --registry ".ai/follow_ups.md"
+   ```
+   Run this only when the registry is missing or obviously stale.
+2. Read unresolved items with:
+   ```bash
+   python3 ~/.claude/skills/follow-up/scripts/sync_follow_ups.py \
+     list \
+     --registry ".ai/follow_ups.md"
+   ```
 3. Present a concise list with:
    - ID
    - title
@@ -131,6 +151,16 @@ State updates:
 - keep the same `FU-###` ID
 - update `Last updated`
 
+Use the helper for the state transition:
+
+```bash
+python3 ~/.claude/skills/follow-up/scripts/sync_follow_ups.py \
+  start-item \
+  --identifier "<FU-### or exact title>" \
+  --linked-plan "<new-or-existing-slug>" \
+  --registry ".ai/follow_ups.md"
+```
+
 Then continue by invoking the chosen planning workflow in the same invocation:
 - `quick-plan` for bounded items
 - `brainstorm` for broader items
@@ -154,6 +184,17 @@ Rules:
 - keep `source_plan`, `source_status`, and `linked_plan`
 - update `notes` with a short reason if resolving as `Superseded` or `Dropped`
 - update `Last updated`
+
+Use the helper for the state transition:
+
+```bash
+python3 ~/.claude/skills/follow-up/scripts/sync_follow_ups.py \
+  resolve-item \
+  --identifier "<FU-### or exact title>" \
+  --target-section Done|Superseded|Dropped \
+  --notes "<reason when needed>" \
+  --registry ".ai/follow_ups.md"
+```
 
 Interpretation:
 - `Done` — the follow-up was completed

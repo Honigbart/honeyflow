@@ -154,10 +154,41 @@ After review completes for the current phase, immediately start Step A for the n
 
 When every phase is `done` and `reviewed`:
 1. Mark linked todo items as done (same rules as `execute-review`)
-2. Update `.ai/follow_ups.md` if it exists:
-   - for entries where `source_plan: <slug>`, set `source_status: completed`
-   - for entries where `linked_plan: <slug>`, move them to `## Done`
-   - if no entry exists for this source plan but `final_plan.md` contains `## 14. Follow-on Artifacts`, create open entries first, then mark `source_status: completed`
+2. Update `.ai/follow_ups.md` with the bundled helper before deleting the live plan directory:
+   - if `.ai/follow_ups.md` is missing, rebuild it first:
+     ```bash
+     python3 ~/.claude/skills/follow-up/scripts/sync_follow_ups.py \
+       rebuild \
+       --plans-index ".ai/plans.md" \
+       --plans-dir ".ai/plans" \
+       --archive-dir ".ai/archive" \
+       --registry ".ai/follow_ups.md"
+     ```
+   - sync this plan's `## 14. Follow-on Artifacts` into the registry with completed source status:
+     ```bash
+     python3 ~/.claude/skills/follow-up/scripts/sync_follow_ups.py \
+       sync-plan \
+       --source-plan "<slug>" \
+       --source-status completed \
+       --plan-file ".ai/plans/<slug>/final_plan.md" \
+       --registry ".ai/follow_ups.md"
+     ```
+   - then mark every entry sourced from this plan as completed:
+     ```bash
+     python3 ~/.claude/skills/follow-up/scripts/sync_follow_ups.py \
+       mark-source-status \
+       --source-plan "<slug>" \
+       --source-status completed \
+       --registry ".ai/follow_ups.md"
+     ```
+   - then mark any follow-up linked to this completed successor plan as done:
+     ```bash
+     python3 ~/.claude/skills/follow-up/scripts/sync_follow_ups.py \
+       resolve-linked-plan \
+       --linked-plan "<slug>" \
+       --target-section Done \
+       --registry ".ai/follow_ups.md"
+     ```
 3. Archive the final review artifact
 4. Copy `.ai/plans/<slug>/` to `.ai/archive/<slug>/`
 5. Update `.ai/plans.md`: set status to `completed`

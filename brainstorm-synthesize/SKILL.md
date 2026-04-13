@@ -363,35 +363,16 @@ Before finishing:
 2. Ensure it contains all required sections
 3. Ensure "Accepted Critiques" and "Rejected Critiques" are both substantive, or explicitly state that no critique artifact was available
 4. If the critique artifact came from Claude fallback rather than Codex, make that provenance explicit in the plan
-5. Update `.ai/follow_ups.md`:
-   - ensure it exists with this format if missing:
-     ```markdown
-     # Follow-Ups
-
-     > Last updated: YYYY-MM-DD
-
-     ## Open
-
-     ## Started
-
-     ## Done
-
-     ## Superseded
-
-     ## Dropped
-     ```
-   - sync `## Open` entries for this source plan from `## 14. Follow-on Artifacts`
-   - use stable IDs like `FU-001`
-   - preserve unchanged open entries for this source plan
-   - if an earlier open entry from this source plan disappeared from the new `## 14`, move it to `## Superseded` instead of deleting it
-   - each entry must use this block shape:
-     ```markdown
-     ### FU-001 — <descriptive title>
-     - source_plan: <slug>
-     - source_status: active
-     - linked_plan: none
-     - notes: <short rationale or trigger>
-     ```
+5. Sync `.ai/follow_ups.md` with the bundled helper:
+   ```bash
+   python3 ~/.claude/skills/follow-up/scripts/sync_follow_ups.py \
+     sync-plan \
+     --source-plan "<slug>" \
+     --source-status active \
+     --plan-file ".ai/plans/<slug>/final_plan.md" \
+     --registry ".ai/follow_ups.md"
+   ```
+   This preserves stable `FU-*` IDs for unchanged open items from the same source plan, creates new IDs for new items, and moves removed open items for this source plan to `## Superseded`.
 6. Ensure the plan ends with a clear implementation handoff
 7. Ensure `.ai/plans.md` status for this slug is updated to `active`
 8. Then provide a short in-chat summary of the chosen direction, biggest remaining risk, and most important next step
