@@ -364,6 +364,15 @@ Before finishing:
 3. Ensure "Accepted Critiques" and "Rejected Critiques" are both substantive, or explicitly state that no critique artifact was available
 4. If the critique artifact came from Claude fallback rather than Codex, make that provenance explicit in the plan
 5. Sync `.ai/follow_ups.md` with the bundled helper:
+   - if `.ai/follow_ups.md` is missing, rebuild it first:
+     ```bash
+     python3 ~/.claude/skills/follow-up/scripts/sync_follow_ups.py \
+       rebuild \
+       --plans-index ".ai/plans.md" \
+       --plans-dir ".ai/plans" \
+       --archive-dir ".ai/archive" \
+       --registry ".ai/follow_ups.md"
+     ```
    ```bash
    python3 ~/.claude/skills/follow-up/scripts/sync_follow_ups.py \
      sync-plan \
@@ -372,7 +381,7 @@ Before finishing:
      --plan-file ".ai/plans/<slug>/final_plan.md" \
      --registry ".ai/follow_ups.md"
    ```
-   This preserves stable `FU-*` IDs for unchanged open items from the same source plan, creates new IDs for new items, and moves removed open items for this source plan to `## Superseded`.
+   This preserves stable `FU-*` IDs for unchanged entries, avoids recreating already-started follow-ups as new open rows, creates new IDs for new items, and moves removed open items for this source plan to `## Superseded`.
 6. Ensure the plan ends with a clear implementation handoff
 7. Ensure `.ai/plans.md` status for this slug is updated to `active`
 8. Then provide a short in-chat summary of the chosen direction, biggest remaining risk, and most important next step

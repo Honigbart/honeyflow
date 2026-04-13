@@ -213,11 +213,26 @@ def sync_plan(registry: Registry, source_plan: str, source_status: str, items: l
     source_open_by_title: dict[str, list[Entry]] = {}
     for entry in source_open_entries:
         source_open_by_title.setdefault(entry.title, []).append(entry)
+    source_non_open_titles = {
+        entry.title
+        for section in SECTION_ORDER
+        if section != "Open"
+        for entry in registry.sections[section]
+        if entry.source_plan == source_plan
+    }
 
     new_entries: list[Entry] = []
     preserved = 0
     created = 0
     matched_ids: set[str] = set()
+    next_num = max(
+        (
+            int(entry.id.split("-")[1])
+            for entry in registry.all_entries()
+            if re.fullmatch(r"FU-\d{3,}", entry.id)
+        ),
+        default=0,
+    )
 
     for title, notes in items:
         matches = source_open_by_title.get(title, [])
@@ -229,11 +244,14 @@ def sync_plan(registry: Registry, source_plan: str, source_status: str, items: l
             entry.source_status = source_status
             entry.linked_plan = "none" if entry.linked_plan == "" else entry.linked_plan
             new_entries.append(entry)
+        elif title in source_non_open_titles:
+            preserved += 1
         else:
             created += 1
+            next_num += 1
             new_entries.append(
                 Entry(
-                    id=registry.next_id(),
+                    id=f"FU-{next_num:03d}",
                     title=title,
                     source_plan=source_plan,
                     source_status=source_status,

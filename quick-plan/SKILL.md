@@ -277,6 +277,15 @@ Before finishing:
 2. Ensure the roadmap phases are concrete and proportional
 3. If re-planning from critique: ensure the old plan snapshot exists in `.ai/plans/<slug>/superseded/` before overwrite
 4. Sync `.ai/follow_ups.md` with the bundled helper:
+   - if `.ai/follow_ups.md` is missing, rebuild it first:
+     ```bash
+     python3 ~/.claude/skills/follow-up/scripts/sync_follow_ups.py \
+       rebuild \
+       --plans-index ".ai/plans.md" \
+       --plans-dir ".ai/plans" \
+       --archive-dir ".ai/archive" \
+       --registry ".ai/follow_ups.md"
+     ```
    ```bash
    python3 ~/.claude/skills/follow-up/scripts/sync_follow_ups.py \
      sync-plan \
@@ -285,7 +294,7 @@ Before finishing:
      --plan-file ".ai/plans/<slug>/final_plan.md" \
      --registry ".ai/follow_ups.md"
    ```
-   This preserves stable `FU-*` IDs for unchanged open items from the same source plan, creates new IDs for new items, and moves removed open items for this source plan to `## Superseded`.
+   This preserves stable `FU-*` IDs for unchanged entries, avoids recreating already-started follow-ups as new open rows, creates new IDs for new items, and moves removed open items for this source plan to `## Superseded`.
 5. If re-planning: delete stale `.ai/plans/<slug>/codex_critique.md` and `.ai/plans/<slug>/ollama_critique.md` if they existed
 6. Ensure `.ai/plans.md` has an entry for this slug with status `active`
 7. Then provide the short in-chat summary
