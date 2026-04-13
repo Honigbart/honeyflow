@@ -52,6 +52,7 @@ All pipeline skills operate on **namespaced plans**. Each plan has a unique slug
 - `.ai/plans/<slug>/review.md` — active review artifact for the current phase
 - `.ai/plans/<slug>/ollama_review.md` — optional local Ollama review artifact for the current phase
 - `.ai/archive/` — archived completed review artifacts and completed plans
+- `.ai/follow_ups.md` — durable working index of unresolved follow-on artifacts across plans
 
 **Plan statuses** (tracked in `.ai/plans.md`): `brainstorming` · `active` · `completed` · `abandoned`
 
@@ -531,11 +532,15 @@ Use this gate:
 
 If both are true, and the user has not said to keep the plan active:
 1. **Mark linked todo items as done.** Check whether `.ai/plans/<slug>/final_plan.md` contains a `## 15. Todo References` section. If it does, read `.ai/todo.md` and mark each referenced item as done (move to the **Done** section with `[x]` and append `— YYYY-MM-DD`). If `.ai/todo.md` does not exist or a referenced item is not found (already removed or reworded), skip silently.
-2. Record the final review archive path in `## 7. Final Outcome` in `review.md` and in `review_notes` in `execution_state.md`
-3. Ensure the final review artifact is archived while the live plan directory still exists
-4. Copy `.ai/plans/<slug>/` contents to `.ai/archive/<slug>/`
-5. Update `.ai/plans.md`: set status to `completed`
-6. Delete `.ai/plans/<slug>/` directory as the final filesystem step
+2. **Update follow-up registry.** If `.ai/follow_ups.md` exists, update it before deleting the live plan directory:
+   - for entries where `source_plan: <slug>`, set `source_status: completed`
+   - for entries where `linked_plan: <slug>`, move them to `## Done`
+   - if no entry exists for this source plan but `final_plan.md` contains `## 14. Follow-on Artifacts`, create open entries first, then mark `source_status: completed`
+3. Record the final review archive path in `## 7. Final Outcome` in `review.md` and in `review_notes` in `execution_state.md`
+4. Ensure the final review artifact is archived while the live plan directory still exists
+5. Copy `.ai/plans/<slug>/` contents to `.ai/archive/<slug>/`
+6. Update `.ai/plans.md`: set status to `completed`
+7. Delete `.ai/plans/<slug>/` directory as the final filesystem step
 
 Once the plan directory is deleted, the archived review snapshot becomes the canonical review artifact for that phase. Do not expect `.ai/plans/<slug>/review.md` to remain present after full plan archival.
 
@@ -552,7 +557,7 @@ If any phase remains `in disagreement`, do not archive the plan unless the user 
 - Do not commit on a time-based cadence or merely because a review invocation happened
 - Use at most one Claude fix commit and one Codex fix commit per pass through the loop, unless Step 5 requires a final Codex fix commit
 - Do not create a commit for review notes, `review.md`, `execution_state.md`, todo updates, or archive bookkeeping alone
-- Exception: if this invocation finalizes the entire plan archive, stage and commit the finalization changes as one atomic commit with message `Archive completed plan <slug>`. That finalization commit should include the updated `.ai/plans.md`, any `.ai/todo.md` changes caused by linked todo completion, the archived `.ai/archive/<slug>/` snapshot, and the deletion of `.ai/plans/<slug>/`.
+- Exception: if this invocation finalizes the entire plan archive, stage and commit the finalization changes as one atomic commit with message `Archive completed plan <slug>`. That finalization commit should include the updated `.ai/plans.md`, any `.ai/todo.md` changes caused by linked todo completion, any `.ai/follow_ups.md` changes caused by follow-up sync, the archived `.ai/archive/<slug>/` snapshot, and the deletion of `.ai/plans/<slug>/`.
 - Never create empty commits
 - Never commit unrelated worktree changes
 - Stage only files within the reviewed phase scope, plus the minimal `.ai/` state files that truthfully record the review result

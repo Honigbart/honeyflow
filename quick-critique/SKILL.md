@@ -182,8 +182,10 @@ Instead, continue in the same invocation:
 1. finish the Codex critique pass
 2. run the local Ollama critique too if available
 3. re-run the `quick-plan` re-plan behavior for the same slug immediately
-4. overwrite `.ai/plans/<slug>/final_plan.md` with the updated plan
-5. delete stale `.ai/plans/<slug>/codex_critique.md` and `.ai/plans/<slug>/ollama_critique.md` after the new plan is written
+4. if critique artifacts exist, snapshot the current `.ai/plans/<slug>/final_plan.md` to `.ai/plans/<slug>/superseded/YYYYMMDD-HHMMSS-pre-apply-final_plan.md`
+5. overwrite `.ai/plans/<slug>/final_plan.md` with the updated plan
+6. ensure the revised plan preserves deferred broader direction in `## 4. Accepted Critiques`, `## 6. Final MVP Scope`, and `## 14. Follow-on Artifacts`
+7. delete stale `.ai/plans/<slug>/codex_critique.md` and `.ai/plans/<slug>/ollama_critique.md` after the new plan is written
 
 This is intentionally equivalent to:
 
@@ -198,6 +200,7 @@ Rules for `--apply`:
 - critique first, then re-plan
 - preserve the same slug
 - follow `quick-plan`'s re-plan rules and final plan structure
+- preserve the old plan snapshot before overwrite when critique artifacts triggered the re-plan
 - do not silently keep stale critique artifacts after applying them
 - if execution has already started for the slug, do not auto-apply; warn and stop instead
 - if the critique is empty or clearly failed, do not auto-apply; surface the failure instead
@@ -362,5 +365,6 @@ Before finishing:
 2. If `--apply` was **not** used: ensure the critique contains meaningful markdown and is not just whitespace
 3. If `--apply` was **not** used: ensure the critique clearly targets the `final_plan.md` content
 4. If Claude fallback was used, ensure the provenance note is explicit and truthful
-5. If `--apply` **was** used: ensure `.ai/plans/<slug>/final_plan.md` was updated and stale critique artifacts were deleted
-6. Then provide a short in-chat summary of the result
+5. If `--apply` **was** used: ensure the old plan snapshot exists under `.ai/plans/<slug>/superseded/`
+6. If `--apply` **was** used: ensure `.ai/plans/<slug>/final_plan.md` was updated, deferred broader direction was preserved in the revised plan, and stale critique artifacts were deleted
+7. Then provide a short in-chat summary of the result

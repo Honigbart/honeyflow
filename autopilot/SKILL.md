@@ -48,6 +48,7 @@ All pipeline skills operate on **namespaced plans**. Each plan has a unique slug
 - `.ai/plans/<slug>/review.md` — active review artifact
 - `.ai/plans/<slug>/ollama_review.md` — optional local Ollama review artifact
 - `.ai/archive/` — completed, abandoned, or superseded plan artifacts
+- `.ai/follow_ups.md` — durable working index of unresolved follow-on artifacts across plans
 - `.ai/todo.md` — project-level todo list (global, not per-plan)
 
 **Plan statuses** (tracked in `.ai/plans.md`): `brainstorming` · `active` · `completed` · `abandoned`
@@ -153,12 +154,16 @@ After review completes for the current phase, immediately start Step A for the n
 
 When every phase is `done` and `reviewed`:
 1. Mark linked todo items as done (same rules as `execute-review`)
-2. Archive the final review artifact
-3. Copy `.ai/plans/<slug>/` to `.ai/archive/<slug>/`
-4. Update `.ai/plans.md`: set status to `completed`
-5. Delete `.ai/plans/<slug>/`
-6. Stage and commit the finalization changes as one atomic commit with message `Archive completed plan <slug>`. Include `.ai/plans.md`, any `.ai/todo.md` changes, the archived `.ai/archive/<slug>/` snapshot, and the deletion of `.ai/plans/<slug>/`.
-7. Report to the user (see reporting section)
+2. Update `.ai/follow_ups.md` if it exists:
+   - for entries where `source_plan: <slug>`, set `source_status: completed`
+   - for entries where `linked_plan: <slug>`, move them to `## Done`
+   - if no entry exists for this source plan but `final_plan.md` contains `## 14. Follow-on Artifacts`, create open entries first, then mark `source_status: completed`
+3. Archive the final review artifact
+4. Copy `.ai/plans/<slug>/` to `.ai/archive/<slug>/`
+5. Update `.ai/plans.md`: set status to `completed`
+6. Delete `.ai/plans/<slug>/`
+7. Stage and commit the finalization changes as one atomic commit with message `Archive completed plan <slug>`. Include `.ai/plans.md`, any `.ai/todo.md` changes, any `.ai/follow_ups.md` changes, the archived `.ai/archive/<slug>/` snapshot, and the deletion of `.ai/plans/<slug>/`.
+8. Report to the user (see reporting section)
 
 ## Autonomous decision rules
 

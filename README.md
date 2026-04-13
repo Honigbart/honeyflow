@@ -18,6 +18,7 @@ The goal is simple: think before you build, get a second opinion, execute with d
 | `/quality-eval` | Durable qualitative evaluation for slow comparisons, output-quality checks, and fresh-session handoff via `.ai/evals/<slug>/`. |
 | `/autopilot` | Fully autonomous execution + review of all phases. No user input needed. |
 | `/evolve` | Takes a completed plan and proposes a grounded v2 direction. |
+| `/follow-up` | Lists, starts, and resolves durable follow-on artifacts from active and archived plans via `.ai/follow_ups.md`. |
 | `/todo` | Lightweight project todo list with priority buckets. Feeds context into planning. |
 | `/plan-migrate` | Migrates plan layouts when the skill format changes. |
 
@@ -38,7 +39,7 @@ mkdir -p ~/.claude/skills
 
 for skill in brainstorm brainstorm-critique brainstorm-synthesize \
              quick-plan quick-critique execute-plan execute-review quality-eval \
-             autopilot evolve todo plan-migrate; do
+             autopilot evolve follow-up todo plan-migrate; do
   ln -s ~/honeyflow/$skill ~/.claude/skills/$skill
 done
 ```
@@ -48,7 +49,7 @@ done
 ```powershell
 $skills = @("brainstorm","brainstorm-critique","brainstorm-synthesize",
             "quick-plan","quick-critique","execute-plan","execute-review","quality-eval",
-            "autopilot","evolve","todo","plan-migrate")
+            "autopilot","evolve","follow-up","todo","plan-migrate")
 
 foreach ($skill in $skills) {
   New-Item -ItemType SymbolicLink `
@@ -142,6 +143,7 @@ All state lives under `.ai/` in your project root:
 ```
 .ai/
 ├── plans.md                        # index of all plans (slug, status, description)
+├── follow_ups.md                   # durable registry of unresolved follow-on artifacts
 ├── todo.md                         # project todo list (Now / Next / Later / Done)
 ├── plans/
 │   └── <slug>/                     # one directory per active plan
@@ -153,12 +155,15 @@ All state lives under `.ai/` in your project root:
 │       ├── ollama_critique.md      # optional local Ollama critique output
 │       ├── evolution_plan.md       # evolution proposal (evolve only)
 │       ├── review.md               # active phase review artifact
-│       └── ollama_review.md        # optional local Ollama review artifact
+│       ├── ollama_review.md        # optional local Ollama review artifact
+│       └── superseded/             # optional snapshots before critique-driven overwrite
 └── archive/                        # completed or abandoned plans
     └── <slug>/                     # full copy of the plan directory at completion
 ```
 
 `todo.md` is global, not per-plan. It sits at `.ai/todo.md` and is shared across all plans. Plans reference specific todo items, and those references travel through the pipeline so they can be auto-completed when a plan is archived.
+
+`follow_ups.md` is also global, but it solves a different problem. It is the durable working registry for unresolved `## 14. Follow-on Artifacts` coming from active or archived final plans. Unlike `todo.md`, it preserves source-plan provenance and can be picked up later by `/follow-up` without re-scanning every archived plan.
 
 For qualitative validation that is not normal unit/integration testing, `/quality-eval` uses a separate durable area:
 
@@ -192,9 +197,18 @@ There are two paths into the pipeline:
 
 All paths produce the same `final_plan.md` structure, so execution and review work identically regardless of how the plan was created. `/autopilot` replaces the manual `/execute-plan` + `/execute-review` loop when you want fully autonomous execution. After a plan is fully implemented and reviewed, `/evolve` can kick off the next version.
 
-### The todo list
+Follow-on artifacts are a separate loop:
+```
+/follow-up → (list | start | resolve)
+```
+
+`/follow-up start` can turn one preserved follow-on artifact into a new `/quick-plan` or `/brainstorm`, while keeping the source-plan link.
+
+### Todo vs Follow-Ups
 
 `/todo` maintains a lightweight task list at `.ai/todo.md` with three priority buckets: **Now**, **Next**, and **Later**. It's not just a standalone list though. When you run `/brainstorm` or `/quick-plan`, the skill reads your Now and Next items and uses them as context. If a plan addresses specific todo items, it tracks that reference all the way through: brainstorm notes it, synthesize carries it into the final plan, and when `/execute-review` archives a fully completed plan, the referenced todo items get auto-marked as done.
+
+`/follow-up` is different. It works from `## 14. Follow-on Artifacts` in final plans and keeps a durable registry at `.ai/follow_ups.md` with source-plan provenance. Use it for deferred artifacts, broader-next-path items, or follow-on documents that should not be flattened into the simple Now/Next/Later todo list.
 
 ```
 You:    /todo
@@ -208,6 +222,20 @@ Claude: [reads todo, sees the Now item, references it in the plan]
         ... (execute + review cycle)
 
 Claude: [archives plan, auto-marks "fix rate limiting" as done in todo.md]
+```
+
+### Follow-up flow
+
+```
+You:    /follow-up
+
+Claude: [reads .ai/follow_ups.md]
+        "Open: FU-003 API contracts for prompt templates (source: prompt-templates)"
+
+You:    /follow-up start FU-003
+
+Claude: [chooses quick-plan or brainstorm based on scope]
+Claude: [creates a new linked plan and marks FU-003 as started]
 ```
 
 ## Examples
@@ -329,7 +357,7 @@ Autopilot makes all decisions on its own. If Codex is unavailable, it falls back
 
 **Archive location.** Completed plans currently archive to `.ai/archive/<slug>/`. A future version may move this to `.ai/plans/archive/<slug>/` to keep everything under one roof. When that happens, `/plan-migrate` will handle the transition.
 
-**Recommended git policy for `.ai/`.** A good default is to version active workflow state but keep archived payloads local-only. In practice: track `.ai/plans.md`, `.ai/todo.md`, and active plan directories under `.ai/plans/<slug>/`, but ignore `.ai/archive/`. If `.ai/archive/` was previously tracked, remove it from the index once with `git rm -r --cached .ai/archive` and commit that change; the files stay on disk but stop creating churn in normal development. This is a git-tracking policy change only — it does **not** require `/plan-migrate`, because the on-disk `.ai/` layout stays the same. More generally: use `/plan-migrate` only when the artifact structure or directory layout changes, not when ignore rules or retention policy change.
+**Recommended git policy for `.ai/`.** A good default is to version active workflow state but keep archived payloads local-only. In practice: track `.ai/plans.md`, `.ai/follow_ups.md`, `.ai/todo.md`, and active plan directories under `.ai/plans/<slug>/`, but ignore `.ai/archive/`. If `.ai/archive/` was previously tracked, remove it from the index once with `git rm -r --cached .ai/archive` and commit that change; the files stay on disk but stop creating churn in normal development. This is a git-tracking policy change only — it does **not** require `/plan-migrate`, because the on-disk `.ai/` layout stays the same. More generally: use `/plan-migrate` only when the artifact structure or directory layout changes, not when ignore rules or retention policy change.
 
 **Updating the skills.** When the skill format changes (new artifact structure, renamed fields, directory layout changes), `/plan-migrate` acts as the migration engine. It detects outdated layouts in your project and upgrades them to the current format, similar to how database migrations work. Pull the latest skills, and if your `.ai/` layout needs updating, `/plan-migrate` will tell you.
 

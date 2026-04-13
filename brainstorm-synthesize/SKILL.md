@@ -56,6 +56,7 @@ All pipeline skills operate on **namespaced plans**. Each plan has a unique slug
 - `.ai/plans/<slug>/evolution_plan.md` — evolution proposal
 - `.ai/plans/<slug>/review.md` — active review artifact
 - `.ai/archive/` — completed, abandoned, or superseded plan artifacts
+- `.ai/follow_ups.md` — durable working index of unresolved follow-on artifacts across plans
 - `.ai/todo.md` — project-level todo list (global, not per-plan)
 
 **Plan statuses** (tracked in `.ai/plans.md`): `brainstorming` · `active` · `completed` · `abandoned`
@@ -157,6 +158,7 @@ Before starting:
 Always create or overwrite `.ai/plans/<slug>/final_plan.md`.
 
 After writing, update `.ai/plans.md`: set this plan's status from `brainstorming` to `active`.
+Also create or update `.ai/follow_ups.md` from `## 14. Follow-on Artifacts`.
 
 Also provide a short in-chat summary of:
 - the chosen direction
@@ -291,13 +293,22 @@ Do not collapse multiple major implementation steps into one oversized phase.
 Give a concrete ordered task list that could directly guide work.
 
 ## 14. Follow-on Artifacts
-List the most useful next documents to generate next, such as:
+List the most useful next follow-on artifacts or deferred next-path items using flat bullets only, such as:
 - README.md
 - AGENTS.md
 - TASKS.md
 - ARCHITECTURE.md
 - DB_SCHEMA.md
 - API_CONTRACTS.md
+
+Use this exact format for each item:
+- `<descriptive title> — <short rationale or trigger>`
+
+Rules:
+- titles must be descriptive enough to stand alone outside the plan
+- if accepted critique intentionally narrows scope, preserve the deferred broader direction here instead of dropping it
+- this section feeds `.ai/follow_ups.md`, so avoid vague entries like "future stuff"
+- if there are no follow-on artifacts, write `None needed.`
 
 ## 15. Todo References
 If the brainstorm artifact contains a "Todo Context" section listing todo items this plan addresses, carry those references here verbatim.
@@ -352,6 +363,35 @@ Before finishing:
 2. Ensure it contains all required sections
 3. Ensure "Accepted Critiques" and "Rejected Critiques" are both substantive, or explicitly state that no critique artifact was available
 4. If the critique artifact came from Claude fallback rather than Codex, make that provenance explicit in the plan
-5. Ensure the plan ends with a clear implementation handoff
-6. Ensure `.ai/plans.md` status for this slug is updated to `active`
-7. Then provide a short in-chat summary of the chosen direction, biggest remaining risk, and most important next step
+5. Update `.ai/follow_ups.md`:
+   - ensure it exists with this format if missing:
+     ```markdown
+     # Follow-Ups
+
+     > Last updated: YYYY-MM-DD
+
+     ## Open
+
+     ## Started
+
+     ## Done
+
+     ## Superseded
+
+     ## Dropped
+     ```
+   - sync `## Open` entries for this source plan from `## 14. Follow-on Artifacts`
+   - use stable IDs like `FU-001`
+   - preserve unchanged open entries for this source plan
+   - if an earlier open entry from this source plan disappeared from the new `## 14`, move it to `## Superseded` instead of deleting it
+   - each entry must use this block shape:
+     ```markdown
+     ### FU-001 — <descriptive title>
+     - source_plan: <slug>
+     - source_status: active
+     - linked_plan: none
+     - notes: <short rationale or trigger>
+     ```
+6. Ensure the plan ends with a clear implementation handoff
+7. Ensure `.ai/plans.md` status for this slug is updated to `active`
+8. Then provide a short in-chat summary of the chosen direction, biggest remaining risk, and most important next step
