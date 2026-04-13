@@ -1,6 +1,6 @@
 ---
 name: autopilot
-description: Use this skill when the user wants fully autonomous execution and review of an active plan. Loops through all phases without user input — executing each phase, running Codex review, fixing issues, and making all decisions based on the plan, Claude memory, and repo documentation. Only stops when truly stuck on an external dependency or when the entire plan is done.
+description: Use this skill when the user wants fully autonomous execution and review of an active plan. Loops through all phases without user input — executing each phase, running Codex review, adding a local Ollama third voice whenever it is available and the packet fits, fixing issues, and making all decisions based on the plan, Claude memory, and repo documentation. Only stops when truly stuck on an external dependency or when the entire plan is done.
 ---
 
 # Autopilot Skill
@@ -46,6 +46,7 @@ All pipeline skills operate on **namespaced plans**. Each plan has a unique slug
 - `.ai/plans/<slug>/codex_critique.md` — critique artifact
 - `.ai/plans/<slug>/evolution_plan.md` — evolution proposal
 - `.ai/plans/<slug>/review.md` — active review artifact
+- `.ai/plans/<slug>/ollama_review.md` — optional local Ollama review artifact
 - `.ai/archive/` — completed, abandoned, or superseded plan artifacts
 - `.ai/todo.md` — project-level todo list (global, not per-plan)
 
@@ -134,8 +135,9 @@ Immediately after marking a phase `done`, review it. Follow the same rules as `e
 1. Set `review_status: in review`
 2. Run the Codex review command (same `codex exec` prompt as `execute-review`)
 3. Read `review.md`
-4. If clean: mark `reviewed`, archive review artifact, continue to next phase
-5. If findings: run the full Claude fix → Codex re-review → optional Codex fix → Claude final review loop
+4. If the local Ollama reviewer is available and the phase packet fits honestly in one local prompt, run it too and read `ollama_review.md`
+5. If Codex and the local Ollama reviewer are both clean: mark `reviewed`, archive review artifact, continue to next phase
+6. If either review surfaces credible findings: run the full Claude fix → Codex re-review → optional Codex fix → Claude final review loop
 
 Exception:
 - If the just-completed phase and the next adjacent done phase(s) clearly satisfy `execute-review`'s narrow grouped-review exception, you may review that adjacent phase group together instead of one-by-one.
@@ -185,6 +187,7 @@ Never leave a phase `in disagreement` during autopilot. Always resolve it and mo
 ### Codex unavailable
 
 If Codex CLI fails (not installed, rate limit, quota, auth, process error):
+- If the local Ollama reviewer is available and the phase packet fits honestly in one local prompt, you should still run it as supplemental input, but it does **not** replace the blind-spot-breaking fallback below.
 - **Use a subagent for review instead of reviewing your own work directly.** Self-review has an inherent blind-spot problem — you are checking your own implementation and will unconsciously anchor to your own reasoning. A subagent starts with a fresh context window, has not seen your trade-offs or implementation decisions, and approaches the code as a genuinely independent reader.
 - Spawn an Agent with `subagent_type: "general-purpose"` and a review prompt that includes:
   - The phase number, name, objective, and definition of done

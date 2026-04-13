@@ -1,6 +1,6 @@
 ---
 name: brainstorm-critique
-description: Use this skill when a planning artifact in .ai/plans/<slug>/ should be critiqued by Codex CLI as a skeptical external reviewer. Supports both claude_brainstorm.md and evolution_plan.md as input and produces .ai/plans/<slug>/codex_critique.md.
+description: Use this skill when a planning artifact in .ai/plans/<slug>/ should be critiqued by Codex CLI as a skeptical external reviewer. Supports both claude_brainstorm.md and evolution_plan.md as input, produces .ai/plans/<slug>/codex_critique.md, and should also add .ai/plans/<slug>/ollama_critique.md when the local Ollama reviewer is available.
 ---
 
 # Brainstorm Critique Skill
@@ -48,6 +48,7 @@ All pipeline skills operate on **namespaced plans**. Each plan has a unique slug
 - `.ai/plans/<slug>/session_log.md` — session history
 - `.ai/plans/<slug>/claude_brainstorm.md` — brainstorm artifact
 - `.ai/plans/<slug>/codex_critique.md` — critique artifact
+- `.ai/plans/<slug>/ollama_critique.md` — optional local Ollama critique artifact
 - `.ai/plans/<slug>/evolution_plan.md` — evolution proposal
 - `.ai/plans/<slug>/review.md` — active review artifact
 - `.ai/archive/` — completed, abandoned, or superseded plan artifacts
@@ -66,7 +67,7 @@ All pipeline skills operate on **namespaced plans**. Each plan has a unique slug
 - `evolve` creates a NEW plan slug + directory referencing a previous plan. Writes `evolution_plan.md` in the new directory.
 - `autopilot` drives execution and review of all phases autonomously. Uses the same artifacts and rules as `execute-plan` and `execute-review`.
 
-**This skill's state responsibility:** Read one planning input artifact from `.ai/plans/<slug>/` (`claude_brainstorm.md` or `evolution_plan.md`), write `.ai/plans/<slug>/codex_critique.md`. This skill does **not** read or modify plan state files (`final_plan.md`, `execution_state.md`).
+**This skill's state responsibility:** Read one planning input artifact from `.ai/plans/<slug>/` (`claude_brainstorm.md` or `evolution_plan.md`), write `.ai/plans/<slug>/codex_critique.md`, and optionally write `.ai/plans/<slug>/ollama_critique.md` when the local Ollama reviewer is available. This skill does **not** read or modify plan state files (`final_plan.md`, `execution_state.md`).
 
 ## Legacy layout detection
 
@@ -173,6 +174,67 @@ After Codex finishes:
    - biggest weakness
    - strongest surviving direction or recommendation
 
+## Local Ollama third voice
+
+After a successful Codex critique, run a local supplemental critique whenever both of these are true:
+- `ollama` is installed and callable
+- `ollama list` shows `gemma4-plan-critic` (typically `gemma4-plan-critic:latest`)
+
+This is required when available, but non-blocking on failure:
+- if the model is unavailable, skip it silently
+- if the local run fails, note that the local third voice failed and continue
+- Codex remains the primary critique artifact
+- the Ollama critique is advisory only
+
+Write the local supplemental critique to:
+
+`.ai/plans/<slug>/ollama_critique.md`
+
+Use this shape:
+
+```bash
+mkdir -p .ai/plans/<slug> && \
+{
+cat <<'EOF'
+You are the optional local third voice for this planning critique.
+
+Critique the artifact below rigorously, but calibrate to the actual project stage and scope.
+
+If the artifact is an evolution plan, critique it as a grounded v2 proposal rather than as greenfield brainstorming.
+
+Assume a solo-dev or small-team pre-launch context unless the artifact explicitly says otherwise.
+Do not assume enterprise scale, high traffic, many customers, strict compliance requirements, or complex operations unless stated.
+Do not frame routine UI/layout work as major architecture risk unless it would realistically cause correctness, migration, or multi-session maintenance problems.
+Prefer short, concrete findings over long risk essays.
+If you have no meaningful additional concern beyond the primary critique, say so plainly.
+
+Focus on:
+1. weak assumptions
+2. overengineering
+3. hidden costs
+4. migration risk
+5. integration risk
+6. missing edge cases
+7. simpler alternatives
+
+For each major point, indicate severity as one of:
+- real blocker
+- worth considering
+- minor nit
+
+Return only markdown.
+EOF
+printf '\n\n# Planning Artifact\n\n'
+cat .ai/plans/<slug>/<input-file>
+} | ollama run --hidethinking --think false gemma4-plan-critic:latest \
+  > .ai/plans/<slug>/ollama_critique.md
+```
+
+After the local run:
+- read `.ai/plans/<slug>/ollama_critique.md` if it was created
+- if it is empty, generic, or clearly failed, ignore it and do not present it as useful signal
+- summarize only additional meaningful findings, not duplicates of the Codex critique
+
 ## Validation rules
 
 The critique should be concrete and decision-useful.
@@ -231,6 +293,7 @@ Codex has priority for this skill. Always attempt the Codex critique first for e
 
 If both Codex invocations fail in the current invocation (including `command not found` when Codex is not installed, usage limits, auth failures, or process errors):
 - do not stop or ask for permission — fall back automatically to keep the user's flow unbroken
+- if the local Ollama reviewer is available, you should still run it and write `.ai/plans/<slug>/ollama_critique.md`, but it does **not** replace the blind-spot-breaking fallback below
 - **Use a subagent for the critique instead of critiquing directly.** The same blind-spot problem that affects code review also affects plan critique: if Claude just wrote the brainstorm or evolution plan in the same session, critiquing it directly means anchoring to the same reasoning. A subagent starts with a fresh context window and no knowledge of why the plan was written the way it was.
 - Spawn an Agent with `subagent_type: "general-purpose"` and a prompt that includes:
   - The full contents of the planning artifact being critiqued (brainstorm or evolution plan)

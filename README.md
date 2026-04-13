@@ -1,6 +1,6 @@
 # Claude Code Planning Skills
 
-A set of skills for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that bring structured planning, execution, and review to your projects. Plans get critiqued by [Codex CLI](https://github.com/openai/codex) as an independent skeptical reviewer, and completed implementation phases go through a bounded Claude/Codex review loop before the plan is archived.
+A set of skills for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that bring structured planning, execution, and review to your projects. Plans get critiqued by [Codex CLI](https://github.com/openai/codex) as an independent skeptical reviewer, and completed implementation phases go through a bounded Claude/Codex review loop before the plan is archived. If you want extra local scrutiny, the critique and review skills can also add an optional Ollama-based third voice.
 
 The goal is simple: think before you build, get a second opinion, execute with discipline, and review what you shipped.
 
@@ -73,6 +73,52 @@ You'll need an `OPENAI_API_KEY` in your environment. See the [Codex CLI docs](ht
 
 **Without Codex CLI, the full pipeline still works.** You just get Claude-on-Claude review instead of Claude-vs-Codex review.
 
+## Optional: Local Ollama Third Voice
+
+If you want more eyes on plan critique and phase review, the skills can also run a **local Ollama reviewer** after the normal Codex pass.
+
+This is deliberately a supplement, not a new primary gate:
+- Codex remains the primary external reviewer.
+- Ollama findings are advisory only.
+- If `ollama` and the configured local model are available, the skills should attempt the Ollama pass.
+- Missing Ollama, missing local model, or a local Ollama failure must not break the normal workflow.
+
+Two Modelfiles are included in this repo:
+
+- `ollama-models/Modelfile-gemma4-26b-plan-critic`
+- `ollama-models/Modelfile-gemma4-26b-code-reviewer`
+
+They are designed for the [unsloth/gemma-4-26B-A4B-it-GGUF](https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF) family on Ollama. A good default is:
+
+- `gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf`
+
+If you need a smaller option, switch the `FROM` line in the Modelfile to a different filename from the same Hugging Face repo, for example:
+
+- `gemma-4-26B-A4B-it-UD-IQ4_NL.gguf`
+
+Example setup:
+
+```bash
+cd ~/honeyflow/claude-skills
+mkdir -p ollama-models/weights
+
+huggingface-cli download unsloth/gemma-4-26B-A4B-it-GGUF \
+  gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf \
+  --local-dir ollama-models/weights
+
+cd ollama-models
+ollama create gemma4-plan-critic -f Modelfile-gemma4-26b-plan-critic
+ollama create gemma4-code-reviewer -f Modelfile-gemma4-26b-code-reviewer
+```
+
+Notes:
+- The `ollama-models/weights/` directory is gitignored on purpose. Keep local GGUF weights there without polluting the repo.
+- If you use a different GGUF filename or quant, edit the `FROM ./weights/...` line in the Modelfile before running `ollama create`.
+- The skills expect these local model names by default:
+  - `gemma4-plan-critic:latest`
+  - `gemma4-code-reviewer:latest`
+- `/plan-migrate` is not needed for this addition. `ollama_critique.md` and `ollama_review.md` are optional artifacts created lazily only when the local Ollama reviewer actually runs.
+
 ## How it works
 
 All state lives under `.ai/` in your project root:
@@ -88,8 +134,10 @@ All state lives under `.ai/` in your project root:
 │       ├── session_log.md          # chronological session history
 │       ├── claude_brainstorm.md    # brainstorm artifact (full path only)
 │       ├── codex_critique.md       # Codex critique output
+│       ├── ollama_critique.md      # optional local Ollama critique output
 │       ├── evolution_plan.md       # evolution proposal (evolve only)
-│       └── review.md              # active phase review artifact
+│       ├── review.md               # active phase review artifact
+│       └── ollama_review.md        # optional local Ollama review artifact
 └── archive/                        # completed or abandoned plans
     └── <slug>/                     # full copy of the plan directory at completion
 ```
@@ -259,6 +307,8 @@ Autopilot makes all decisions on its own. If Codex is unavailable, it falls back
 ## Notes
 
 **Codex CLI required for critiques and reviews.** The `/brainstorm-critique`, `/quick-critique`, and `/execute-review` skills invoke [Codex CLI](https://github.com/openai/codex) through the shell. Unless a skill command explicitly overrides it, those Codex runs inherit the user's local Codex CLI configuration (for example `model` and reasoning settings from `~/.codex/config.toml`). If Codex is unavailable (rate limit, auth failure, quota), all skills fall back to a **Claude subagent** — a separate Claude instance with a fresh context window that has not seen the planning or implementation reasoning. This breaks the "checking your own homework" blind spot that makes self-review unreliable, whether reviewing plans or code. The subagent reads the artifacts independently, applies the same critique/review criteria, and writes findings without anchoring to the original author's reasoning. All fallback artifacts get a provenance note so you know it wasn't Codex. A future invocation will prefer Codex again.
+
+**Local Ollama review is required when available, but still supplemental.** If `ollama` is installed and the local reviewer models exist, the critique and review skills should attempt to write `ollama_critique.md` or `ollama_review.md` on every applicable pass. Those artifacts are advisory only. They add signal, but they do not replace Codex and they must not block the workflow when the local Ollama run is unavailable or fails.
 
 **Plans are durable across sessions.** The `execution_state.md` and `session_log.md` files track exactly where you left off. You can close your terminal, come back tomorrow, run `/execute-plan`, and it picks up from the right phase.
 

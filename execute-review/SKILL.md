@@ -1,6 +1,6 @@
 ---
 name: execute-review
-description: Use this skill when .ai/plans/<slug>/final_plan.md and .ai/plans/<slug>/execution_state.md exist and you want to manually review exactly one completed execution phase through a bounded Claude-Codex review loop. It resumes an unfinished phase review if one exists; otherwise it selects the earliest phase with status done and review_status missing or not reviewed, initializes review tracking fields if absent, has Codex review the phase into .ai/plans/<slug>/review.md, lets Claude attempt fixes and commit them, optionally lets Codex fix persistent issues and commit them, performs one final Claude-Codex disagreement pass, archives the phase review, updates execution_state.md, and if that review completes the last required phase review for a fully implemented plan, archives the plan as well unless the user says otherwise.
+description: Use this skill when .ai/plans/<slug>/final_plan.md and .ai/plans/<slug>/execution_state.md exist and you want to manually review exactly one completed execution phase through a bounded Claude-Codex review loop. It resumes an unfinished phase review if one exists; otherwise it selects the earliest phase with status done and review_status missing or not reviewed, initializes review tracking fields if absent, has Codex review the phase into .ai/plans/<slug>/review.md, should also add .ai/plans/<slug>/ollama_review.md when the local Ollama reviewer is available and the packet fits, lets Claude attempt fixes and commit them, optionally lets Codex fix persistent issues and commit them, performs one final Claude-Codex disagreement pass, archives the phase review, updates execution_state.md, and if that review completes the last required phase review for a fully implemented plan, archives the plan as well unless the user says otherwise.
 ---
 
 # Execute Review Skill
@@ -50,6 +50,7 @@ All pipeline skills operate on **namespaced plans**. Each plan has a unique slug
 - `.ai/plans/<slug>/execution_state.md` — execution status and per-phase review status
 - `.ai/plans/<slug>/session_log.md` — execution history and likely source for touched files
 - `.ai/plans/<slug>/review.md` — active review artifact for the current phase
+- `.ai/plans/<slug>/ollama_review.md` — optional local Ollama review artifact for the current phase
 - `.ai/archive/` — archived completed review artifacts and completed plans
 
 **Plan statuses** (tracked in `.ai/plans.md`): `brainstorming` · `active` · `completed` · `abandoned`
@@ -302,11 +303,73 @@ Write your review as markdown to .ai/plans/<slug>/review.md using these sections
 
 This form has Codex read the files itself and write the output file directly. The `</dev/null` redirect is intentional: it prevents Codex from trying to read extra interactive stdin and appending an unintended `<stdin>` block. After it finishes, verify `.ai/plans/<slug>/review.md` exists and is substantive.
 
+## Local Ollama third voice
+
+After a successful Codex initial review, run a local supplemental review whenever all of these are true:
+- `ollama` is installed and callable
+- `ollama list` shows `gemma4-code-reviewer` (typically `gemma4-code-reviewer:latest`)
+- the review packet is small enough to fit honestly in one local prompt
+
+Use conservative judgment for packet size. If the phase scope is broad, the file list is long, or the relevant files are too large to include faithfully, skip the Ollama pass instead of pretending partial input was a full review.
+
+This is required when available, but non-blocking on failure:
+- if the model is unavailable, skip it silently
+- if the local run fails, note that the local third voice failed and continue
+- Codex remains the primary review artifact
+- the Ollama review is advisory only
+
+Write the local supplemental review to:
+
+`.ai/plans/<slug>/ollama_review.md`
+
+Use this shape:
+
+```bash
+mkdir -p .ai/plans/<slug> && \
+{
+cat <<'EOF'
+You are the optional local third voice for this code review.
+
+Review the packet below and return markdown with exactly these top-level sections:
+# Local Ollama Review
+## 1. Review Target
+## 2. Additional Findings
+## 3. Final Stance
+
+Focus on behavioral bugs, regressions, unmet definition of done, missing tests, and meaningful integration risk.
+Do not spend time on style nits or preference-only comments.
+If you have no meaningful additional concern beyond the primary review, say so plainly.
+EOF
+printf '\n\n# Phase context\n\n'
+printf 'Phase: <X> - <phase name>\n'
+printf 'Objective: <objective>\n'
+printf 'Definition of done: <definition of done>\n'
+printf 'Test command: <test command(s) or not specified>\n'
+printf '\n# Plan context\n\n'
+cat .ai/plans/<slug>/final_plan.md
+printf '\n\n# Primary review\n\n'
+cat .ai/plans/<slug>/review.md
+printf '\n\n# Files in scope\n'
+printf '\n## FILE: <path-1>\n'
+sed -n '1,260p' <path-1>
+printf '\n## FILE: <path-2>\n'
+sed -n '1,260p' <path-2>
+} | ollama run --hidethinking --think false gemma4-code-reviewer:latest \
+  > .ai/plans/<slug>/ollama_review.md
+```
+
+Rules:
+- include only the files that actually define the phase packet; do not silently omit important files and still claim broad review coverage
+- trim very large files to the relevant region only if the omitted parts are clearly irrelevant to the review target
+- if `.ai/plans/<slug>/ollama_review.md` is empty, generic, or clearly failed, ignore it
+- use it only for additional signal, not as a replacement for `review.md`
+
 ## Claude subagent fallback rule
 
 Codex has priority for this skill. Always attempt Codex first (preferred form, then simplified form). Never assume an earlier failure is still in effect.
 
 If both Codex invocations fail (including `command not found` when Codex is not installed, usage limits, auth failures, or process errors):
+- If the local Ollama reviewer is available and the phase packet fits honestly in one local prompt, you should still run it as supplemental input, but it does **not** replace the blind-spot-breaking fallback below.
 - **Use a subagent for review instead of reviewing your own work directly.** Self-review has an inherent blind-spot problem — you are checking code you just orchestrated and will unconsciously anchor to your own reasoning. A subagent starts with a fresh context window and approaches the code as an independent reader.
 - Spawn an Agent with `subagent_type: "general-purpose"` and a review prompt that includes:
   - The phase number, name, objective, and definition of done
@@ -333,13 +396,19 @@ If it does, check whether it belongs to the current target phase (compare `## 1.
 - If it belongs to the **current phase** and `review_status` is `in review`, `claude-fixed`, or `codex-fixed`: this is a resumed review — keep it and continue from the recorded state.
 - If it belongs to the **current phase** but `review_status` is `not reviewed` or missing: this is a leftover from an interrupted run — delete it and start fresh.
 
+Apply the same stale-artifact check to `.ai/plans/<slug>/ollama_review.md` if it exists, but do not treat it as canonical review history:
+- if it belongs to a different phase, delete it before proceeding
+- if it belongs to the current phase and this is a resumed review, keep it
+- if it is stale or unclear, delete it and regenerate only if the optional Ollama pass runs again
+
 ### Step 1 — Codex initial review
 
 1. Set the target phase to `review_status: in review`
 2. Update `execution_state.md`
 3. Run the Codex review command
 4. Read `.ai/plans/<slug>/review.md`
-5. If Codex found no meaningful issues, document that briefly in:
+5. If the local Ollama reviewer is available and the phase packet fits, run it now and read `.ai/plans/<slug>/ollama_review.md`
+6. If Codex found no meaningful issues and the local Ollama review also found no meaningful additional issues, document that briefly in:
    - `## 2. Codex Initial Review`
    - `## 7. Final Outcome`
    Then:
@@ -349,17 +418,19 @@ If it does, check whether it belongs to the current target phase (compare `## 1.
    - if that makes the whole plan implementation-complete and review-complete, archive the plan too
    - update execution state
    - stop
-6. If Codex found meaningful issues, continue to Step 2
+7. If Codex or the local Ollama review found meaningful issues, continue to Step 2
 
 ### Step 2 — Claude fix pass
 
-Claude reads `review.md` and attempts to fix accepted findings in scope.
+Claude reads `review.md` and `ollama_review.md` if present, then attempts to fix accepted findings in scope.
 
 Rules:
 - prioritize high and medium findings
 - low findings may be documented without churn if they are not worth a fix pass
 - do not broaden scope beyond the phase
 - run the smallest relevant verification after changes
+- treat Codex as the primary reviewer when Codex and the Ollama artifact disagree
+- use the local Ollama artifact mainly for extra edge cases, corroboration, or local-only findings that are credibly in scope
 
 If Claude changes code:
 - commit with prefix `Claude's fix of phase X code review`
@@ -587,7 +658,8 @@ After the invocation, report briefly:
 Before finishing:
 1. Ensure `.ai/plans/<slug>/review.md` exists and matches the selected phase, unless the plan itself was archived in this invocation
 2. Ensure the review artifact contains all required sections in the live file or, if the plan was archived in this invocation, in the archived review snapshot
-3. Ensure `execution_state.md` reflects the final review state truthfully
-4. Ensure the final review artifact is archived in `.ai/archive/`
-5. If the review finished the last required phase review for a fully implemented plan, ensure the plan is archived, `plans.md` is updated, and the archived review snapshot contains the final outcome
-6. Then provide the short in-chat summary
+3. If `.ai/plans/<slug>/ollama_review.md` exists, ensure it matches the selected phase or delete it as stale
+4. Ensure `execution_state.md` reflects the final review state truthfully
+5. Ensure the final review artifact is archived in `.ai/archive/`
+6. If the review finished the last required phase review for a fully implemented plan, ensure the plan is archived, `plans.md` is updated, and the archived review snapshot contains the final outcome
+7. Then provide the short in-chat summary

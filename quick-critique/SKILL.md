@@ -1,6 +1,6 @@
 ---
 name: quick-critique
-description: Use this skill when an active plan's .ai/plans/<slug>/final_plan.md should be critiqued by Codex CLI as a skeptical external reviewer — especially for plans created via quick-plan that had no brainstorm-critique step. Produces .ai/plans/<slug>/codex_critique.md. Handles Codex usage limits and fallback the same way as brainstorm-critique.
+description: Use this skill when an active plan's .ai/plans/<slug>/final_plan.md should be critiqued by Codex CLI as a skeptical external reviewer — especially for plans created via quick-plan that had no brainstorm-critique step. Produces .ai/plans/<slug>/codex_critique.md and should also add .ai/plans/<slug>/ollama_critique.md when the local Ollama reviewer is available.
 ---
 
 # Quick Critique Skill
@@ -47,6 +47,7 @@ All pipeline skills operate on **namespaced plans**. Each plan has a unique slug
 - `.ai/plans/<slug>/session_log.md` — session history
 - `.ai/plans/<slug>/claude_brainstorm.md` — brainstorm artifact
 - `.ai/plans/<slug>/codex_critique.md` — critique artifact
+- `.ai/plans/<slug>/ollama_critique.md` — optional local Ollama critique artifact
 - `.ai/plans/<slug>/evolution_plan.md` — evolution proposal
 - `.ai/plans/<slug>/review.md` — active review artifact
 - `.ai/archive/` — completed, abandoned, or superseded plan artifacts
@@ -64,7 +65,7 @@ All pipeline skills operate on **namespaced plans**. Each plan has a unique slug
 - `execute-review` finishing the last required phase review → copies plan dir to `.ai/archive/<slug>/`, deletes `.ai/plans/<slug>/`, sets status to `completed`.
 - `evolve` creates a NEW plan slug + directory referencing a previous plan. Writes `evolution_plan.md` in the new directory.
 
-**This skill's state responsibility:** Read `final_plan.md` from `.ai/plans/<slug>/`, write `.ai/plans/<slug>/codex_critique.md`. This skill does **not** read or modify plan state files (`execution_state.md`, `session_log.md`). It does **not** modify `final_plan.md`.
+**This skill's state responsibility:** Read `final_plan.md` from `.ai/plans/<slug>/`, write `.ai/plans/<slug>/codex_critique.md`, and optionally write `.ai/plans/<slug>/ollama_critique.md` when the local Ollama reviewer is available. This skill does **not** read or modify plan state files (`execution_state.md`, `session_log.md`). It does **not** modify `final_plan.md`.
 
 ## Legacy layout detection
 
@@ -170,6 +171,68 @@ After Codex finishes:
    - strongest confirmation of the plan
    - suggested next step: re-run `/quick-plan <slug>` to incorporate findings, or proceed with `/execute-plan` if no blockers
 
+## Local Ollama third voice
+
+After a successful Codex critique, run a local supplemental critique whenever both of these are true:
+- `ollama` is installed and callable
+- `ollama list` shows `gemma4-plan-critic` (typically `gemma4-plan-critic:latest`)
+
+This is required when available, but non-blocking on failure:
+- if the model is unavailable, skip it silently
+- if the local run fails, note that the local third voice failed and continue
+- Codex remains the primary critique artifact
+- the Ollama critique is advisory only
+
+Write the local supplemental critique to:
+
+`.ai/plans/<slug>/ollama_critique.md`
+
+Use this shape:
+
+```bash
+mkdir -p .ai/plans/<slug> && \
+{
+cat <<'EOF'
+You are the optional local third voice for this plan critique.
+
+Critique the plan below rigorously, but calibrate to the actual project stage and scope.
+
+This is a finalized plan, not a brainstorm. Focus on whether it is actually ready for execution.
+
+Assume a solo-dev or small-team pre-launch context unless the plan explicitly says otherwise.
+Do not assume enterprise scale, high traffic, many customers, strict compliance requirements, or complex operations unless stated.
+Do not frame routine UI/layout work as major architecture risk unless it would realistically cause correctness, migration, or multi-session maintenance problems.
+Prefer short, concrete findings over long risk essays.
+If you have no meaningful additional concern beyond the primary critique, say so plainly.
+
+Focus on:
+1. weak assumptions
+2. overengineering or underengineering
+3. hidden costs
+4. missing phases or roadmap gaps
+5. unrealistic definitions of done
+6. integration risk
+7. missing edge cases
+8. simpler alternatives
+
+For each major point, indicate severity as one of:
+- real blocker
+- worth considering
+- minor nit
+
+Return only markdown.
+EOF
+printf '\n\n# Final Plan\n\n'
+cat .ai/plans/<slug>/final_plan.md
+} | ollama run --hidethinking --think false gemma4-plan-critic:latest \
+  > .ai/plans/<slug>/ollama_critique.md
+```
+
+After the local run:
+- read `.ai/plans/<slug>/ollama_critique.md` if it was created
+- if it is empty, generic, or clearly failed, ignore it and do not present it as useful signal
+- summarize only additional meaningful findings, not duplicates of the Codex critique
+
 ## Validation rules
 
 The critique should be concrete and decision-useful.
@@ -229,6 +292,7 @@ Codex has priority for this skill. Always attempt the Codex critique first for e
 
 If both Codex invocations fail in the current invocation (including `command not found` when Codex is not installed, usage limits, auth failures, or process errors):
 - do not stop or ask for permission — fall back automatically to keep the user's flow unbroken
+- if the local Ollama reviewer is available, you should still run it and write `.ai/plans/<slug>/ollama_critique.md`, but it does **not** replace the blind-spot-breaking fallback below
 - **Use a subagent for the critique instead of critiquing directly.** If Claude orchestrated the plan creation (e.g., via `/quick-plan` in the same session), critiquing it directly means anchoring to the same reasoning. A subagent starts with a fresh context window and evaluates the plan independently.
 - Spawn an Agent with `subagent_type: "general-purpose"` and a prompt that includes:
   - The full contents of `.ai/plans/<slug>/final_plan.md`
@@ -244,7 +308,7 @@ If a future invocation can reach Codex again, prefer Codex and overwrite the Cla
 ## Re-planning flow
 
 After the user reads the critique, they may choose to:
-1. **Re-plan:** Run `/quick-plan <slug>` again. Quick-plan will read `codex_critique.md`, incorporate relevant findings into the updated `final_plan.md`, and then delete the stale `codex_critique.md`.
+1. **Re-plan:** Run `/quick-plan <slug>` again. Quick-plan will read `codex_critique.md` and `ollama_critique.md` if present, incorporate relevant findings into the updated `final_plan.md`, and then delete the stale critique artifacts.
 2. **Proceed anyway:** Run `/execute-plan <slug>` directly. The critique remains as documentation but does not block execution.
 
 This skill does not enforce either path. It produces the critique and lets the user decide.
